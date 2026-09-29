@@ -1,0 +1,22 @@
+# Tasks
+
+- [ ] Foundation CRUD and membership lifecycle complete
+- [ ] Project owner transfer and client-company boundary enforced
+- [ ] Audit query API complete
+- [ ] PostgreSQL RLS migration and isolation test complete
+- [ ] Real readiness checks complete
+- [ ] Document/version/list/detail/download/reprocess APIs complete
+- [ ] PPTX parser and supported-file validation complete
+- [ ] Evidence/Reference/Standard boundary enforced
+- [ ] Fact update/reject/evidence/revision lifecycle complete
+- [ ] Conflict detail/resolve lifecycle complete
+- [ ] GRI coverage/missing-item lifecycle complete
+- [ ] Template/report/section/block lifecycle complete
+- [ ] Comments complete
+- [ ] AI task list/cancel/retry and AI trace APIs complete
+- [ ] Long-running GRI/report/export operations use task runtime
+- [ ] OpenViking and LLM adapter contracts tested
+- [ ] PostgreSQL/MinIO/Redis integration acceptance tests complete
+- [ ] Full business E2E acceptance tests complete
+- [ ] README/API contract updated
+- [ ] Service CI green
