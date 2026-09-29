@@ -51,7 +51,7 @@ async def retry_task(
         await ProjectAccess(db).require(task.project_id, ctx.membership_id, "EDIT_PROJECT")
     clone = await lifecycle.retry(task, ctx.user_id)
     await db.commit()
-    run_ai_task.delay(str(clone.id))
+    run_ai_task.delay(str(clone.id), str(ctx.tenant_id))
     return {"task_id": clone.id, "status": clone.status}
 
 
