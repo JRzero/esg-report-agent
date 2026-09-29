@@ -83,8 +83,18 @@ class ProjectService:
         return p
     async def add_member(self,tenant_id,user_id,owner_membership_id,project_id,membership_id,role):
         await ProjectAccess(self.s).require(project_id,owner_membership_id,'MANAGE_MEMBERS')
+        project=await self.s.scalar(select(Project).where(Project.id==project_id,Project.tenant_id==tenant_id,Project.deleted_at.is_(None)))
+        if not project: raise NotFound('PROJECT_NOT_FOUND','Project not found')
         tm=await self.s.scalar(select(TenantMembership).where(TenantMembership.id==membership_id,TenantMembership.tenant_id==tenant_id,TenantMembership.status=='ACTIVE'))
         if not tm: raise NotFound('MEMBERSHIP_NOT_FOUND','Membership not found')
+        valid_roles={'OWNER','EDITOR','REVIEWER','CLIENT_MEMBER'}
+        if role not in valid_roles: raise DomainError('INVALID_PROJECT_ROLE','Invalid project role',422)
+        if role=='OWNER': raise DomainError('OWNER_TRANSFER_REQUIRED','Use owner transfer endpoint',422)
+        if tm.member_type=='CLIENT':
+            if tm.company_id!=project.company_id: raise DomainError('CLIENT_COMPANY_MISMATCH','Client member can only join projects for its own company',422)
+            if role!='CLIENT_MEMBER': raise DomainError('CLIENT_ROLE_REQUIRED','Client membership requires CLIENT_MEMBER role',422)
+        elif role=='CLIENT_MEMBER':
+            raise DomainError('CLIENT_ROLE_INVALID','Internal member cannot use CLIENT_MEMBER role',422)
         exists=await self.s.scalar(select(ProjectMember).where(ProjectMember.project_id==project_id,ProjectMember.membership_id==membership_id))
         if exists and exists.status=='ACTIVE': raise Conflict('PROJECT_MEMBER_ALREADY_EXISTS','Member already exists')
         if exists: exists.status='ACTIVE'; exists.project_role=role; pm=exists
@@ -94,10 +104,24 @@ class ProjectService:
 class FactService:
     def __init__(self,s:AsyncSession): self.s=s
     async def create_candidate(self,tenant_id,project_id,user_id,data,status='PENDING',confidence=None):
-        sk=semantic_key(data.metric_code,data.name,data.period_start,data.period_end,data.entity_scope,data.dimensions)
-        f=Fact(tenant_id=tenant_id,project_id=project_id,fact_type=data.fact_type,metric_definition_id=data.metric_definition_id,semantic_key=sk,name=data.name,value_type=data.value_type,number_value=data.number_value,text_value=data.text_value,boolean_value=data.boolean_value,date_value=data.date_value,json_value=data.json_value,raw_value=data.raw_value,unit=data.unit,period_start=data.period_start,period_end=data.period_end,entity_scope=data.entity_scope,dimensions=data.dimensions,status=status,source_type=data.source_type,confidence=confidence)
+        metric_definition_id=data.metric_definition_id
+        metric_code=data.metric_code
+        if not metric_definition_id and metric_code:
+            md=await self.s.scalar(select(MetricDefinition).where(MetricDefinition.code==metric_code,((MetricDefinition.tenant_id==tenant_id)|(MetricDefinition.tenant_id.is_(None)))).order_by(MetricDefinition.tenant_id.desc().nullslast()))
+            if md: metric_definition_id=md.id
+        if metric_definition_id and not metric_code:
+            md=await self.s.get(MetricDefinition,metric_definition_id)
+            metric_code=md.code if md else None
+        sk=semantic_key(metric_code,data.name,data.period_start,data.period_end,data.entity_scope,data.dimensions)
+        f=Fact(tenant_id=tenant_id,project_id=project_id,fact_type=data.fact_type,metric_definition_id=metric_definition_id,semantic_key=sk,name=data.name,value_type=data.value_type,number_value=data.number_value,text_value=data.text_value,boolean_value=data.boolean_value,date_value=data.date_value,json_value=data.json_value,raw_value=data.raw_value,unit=data.unit,period_start=data.period_start,period_end=data.period_end,entity_scope=data.entity_scope,dimensions=data.dimensions,status=status,source_type=data.source_type,confidence=confidence)
         self.s.add(f); await self.s.flush()
-        for aid in data.anchor_ids: self.s.add(FactEvidence(fact_id=f.id,document_anchor_id=aid,created_by=user_id))
+        for aid in data.anchor_ids:
+            row=(await self.s.execute(select(DocumentAnchor,DocumentVersion,Document).join(DocumentVersion,DocumentAnchor.document_version_id==DocumentVersion.id).join(Document,DocumentVersion.document_id==Document.id).where(DocumentAnchor.id==aid,DocumentAnchor.project_id==project_id,Document.deleted_at.is_(None)))).first()
+            if not row: raise NotFound('EVIDENCE_ANCHOR_NOT_FOUND','Evidence anchor not found')
+            anchor,_,document=row
+            if document.source_type not in {'EVIDENCE','HISTORICAL'}:
+                raise DomainError('DOCUMENT_NOT_FACT_EVIDENCE','Reference and standard documents cannot establish client facts',422)
+            self.s.add(FactEvidence(fact_id=f.id,document_anchor_id=anchor.id,created_by=user_id))
         self.s.add(FactRevision(fact_id=f.id,revision_no=1,snapshot={'name':f.name,'status':f.status,'semantic_key':sk},change_type='AI_CREATED' if data.source_type=='AI' else 'HUMAN_EDIT',changed_by=user_id))
         await self._detect_conflict(f)
         return f

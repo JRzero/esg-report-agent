@@ -9,14 +9,15 @@ from app.api.deps import current_context
 from app.core.config import get_settings
 from app.core.context import RequestContext
 from app.core.database import get_db
-from app.core.errors import Forbidden, NotFound
+from app.core.errors import DomainError, Forbidden, NotFound
 from app.core.security import create_token, decode_token
 from app.core.permissions import allows
 from app.integrations.storage import storage
+from app.integrations.parsers import SUPPORTED_EXTENSIONS
 from app.modules.models import *
 from app.modules.schemas import *
-from app.modules.services import IdentityService,TenantService,CompanyService,ProjectService,ProjectAccess,FactService,TaskService
-from app.workers.tasks import process_document, run_ai_task
+from app.modules.services import IdentityService,TenantService,CompanyService,ProjectService,ProjectAccess,FactService,TaskService,StandardService,ReportService
+from app.workers.tasks import run_ai_task
 
 router=APIRouter(prefix='/api/v1')
 
@@ -57,7 +58,12 @@ async def create_tenant_member(body:UserCreate,ctx:RequestContext=Depends(curren
     return {'user':UserRead.model_validate(user),'membership':MembershipRead.model_validate(membership)}
 
 @router.get('/companies',response_model=list[CompanyRead],tags=['Companies'])
-async def companies(ctx:RequestContext=Depends(current_context),db=Depends(get_db)): return await CompanyService(db).list(ctx.tenant_id)
+async def companies(ctx:RequestContext=Depends(current_context),db=Depends(get_db)):
+    if ctx.member_type=='CLIENT':
+        if not ctx.company_id: return []
+        try: return [await CompanyService(db).get(ctx.tenant_id,ctx.company_id)]
+        except NotFound: return []
+    return await CompanyService(db).list(ctx.tenant_id)
 @router.post('/companies',response_model=CompanyRead,status_code=201,tags=['Companies'])
 async def create_company(body:CompanyCreate,ctx:RequestContext=Depends(current_context),db=Depends(get_db)):
     if ctx.tenant_role!='ADMIN': raise Forbidden('TENANT_ADMIN_REQUIRED','Tenant admin required')
@@ -67,6 +73,7 @@ async def create_company(body:CompanyCreate,ctx:RequestContext=Depends(current_c
 async def projects(ctx:RequestContext=Depends(current_context),db=Depends(get_db)): return await ProjectService(db).list(ctx.tenant_id,ctx.membership_id)
 @router.post('/projects',response_model=ProjectRead,status_code=201,tags=['Projects'])
 async def create_project(body:ProjectCreate,ctx:RequestContext=Depends(current_context),db=Depends(get_db)):
+    if ctx.member_type!='INTERNAL': raise Forbidden('PROJECT_CREATE_DENIED','Client members cannot create projects')
     obj=await ProjectService(db).create(ctx.tenant_id,ctx.user_id,ctx.membership_id,body); await db.commit(); return obj
 @router.get('/projects/{project_id}',response_model=ProjectRead,tags=['Projects'])
 async def project(project_id:UUID,ctx:RequestContext=Depends(current_context),db=Depends(get_db)): return await ProjectService(db).get(ctx.tenant_id,project_id,ctx.membership_id)
@@ -76,14 +83,28 @@ async def add_member(project_id:UUID,body:ProjectMemberCreate,ctx:RequestContext
 
 @router.post('/projects/{project_id}/documents',status_code=201,tags=['Documents'])
 async def upload_document(project_id:UUID,file:UploadFile=File(...),source_type:str=Form('EVIDENCE'),category_code:str|None=Form(None),ctx:RequestContext=Depends(current_context),db=Depends(get_db)):
-    await ProjectAccess(db).require(project_id,ctx.membership_id,'UPLOAD_DOCUMENT'); data=await file.read(); digest=sha256(data).hexdigest()
-    d=Document(tenant_id=ctx.tenant_id,project_id=project_id,name=file.filename or 'document',source_type=source_type,category_code=category_code,created_by=ctx.user_id); db.add(d); await db.flush()
-    v=DocumentVersion(document_id=d.id,version_no=1,original_filename=file.filename or 'document',mime_type=file.content_type,file_extension=Path(file.filename or '').suffix.lower(),file_size=len(data),object_key=f'tenants/{ctx.tenant_id}/projects/{project_id}/documents/{d.id}/versions/v1/original{Path(file.filename or "").suffix.lower()}',sha256=digest,uploaded_by=ctx.user_id); db.add(v); await db.flush()
-    await storage().put(v.object_key,data,file.content_type)
+    await ProjectAccess(db).require(project_id,ctx.membership_id,'UPLOAD_DOCUMENT')
+    source_type=source_type.upper()
+    if source_type not in {'EVIDENCE','REFERENCE','STANDARD','HISTORICAL'}:
+        raise DomainError('INVALID_DOCUMENT_SOURCE_TYPE','Invalid document source type',422)
+    filename=file.filename or 'document'
+    extension=Path(filename).suffix.lower()
+    if extension not in SUPPORTED_EXTENSIONS:
+        raise DomainError('DOCUMENT_TYPE_UNSUPPORTED',f'Unsupported file extension: {extension or "(none)"}',422,{'supported':sorted(SUPPORTED_EXTENSIONS)})
+    data=await file.read()
+    if not data: raise DomainError('DOCUMENT_EMPTY','Uploaded document is empty',422)
+    digest=sha256(data).hexdigest()
+    d=Document(tenant_id=ctx.tenant_id,project_id=project_id,name=filename,source_type=source_type,category_code=category_code,created_by=ctx.user_id); db.add(d); await db.flush()
+    v=DocumentVersion(document_id=d.id,version_no=1,original_filename=filename,mime_type=file.content_type,file_extension=extension,file_size=len(data),object_key=f'tenants/{ctx.tenant_id}/projects/{project_id}/documents/{d.id}/versions/v1/original{extension}',sha256=digest,uploaded_by=ctx.user_id); db.add(v); await db.flush()
     await db.commit()
-    try: process_document.delay(str(v.id))
-    except AttributeError: pass
-    return {'document_id':d.id,'version_id':v.id,'status':'UPLOADED'}
+    try:
+        await storage().put(v.object_key,data,file.content_type)
+    except Exception as exc:
+        v.validation_status='FAILED'; v.parse_error=str(exc)[:4000]; await db.commit()
+        raise DomainError('STORAGE_WRITE_FAILED','Failed to persist document',503) from exc
+    task=await TaskService(db).create(ctx.tenant_id,project_id,ctx.user_id,'DOCUMENT_PROCESS','DOCUMENT_VERSION',v.id)
+    await db.commit(); run_ai_task.delay(str(task.id), str(ctx.tenant_id))
+    return {'document_id':d.id,'version_id':v.id,'status':'UPLOADED','processing_task_id':task.id}
 
 @router.get('/document-versions/{version_id}/anchors',tags=['Documents'])
 async def anchors(version_id:UUID,ctx:RequestContext=Depends(current_context),db=Depends(get_db)):
@@ -126,7 +147,8 @@ async def add_project_standard(project_id:UUID,version_id:UUID,ctx:RequestContex
 @router.post('/projects/{project_id}/reports',status_code=201,tags=['Reports'])
 async def create_report(project_id:UUID,body:ReportCreate,ctx:RequestContext=Depends(current_context),db=Depends(get_db)):
     await ProjectAccess(db).require(project_id,ctx.membership_id,'EDIT_REPORT')
-    r=Report(tenant_id=ctx.tenant_id,project_id=project_id,created_by=ctx.user_id,**body.model_dump()); db.add(r); await db.commit(); await db.refresh(r); return r
+    r=await ReportService(db).create_report(ctx.tenant_id,project_id,ctx.user_id,body.title,body.language,body.template_version_id)
+    await db.commit(); await db.refresh(r); return r
 @router.post('/reports/{report_id}/sections',status_code=201,tags=['Reports'])
 async def create_section(report_id:UUID,body:SectionCreate,ctx:RequestContext=Depends(current_context),db=Depends(get_db)):
     r=await db.get(Report,report_id); await ProjectAccess(db).require(r.project_id,ctx.membership_id,'EDIT_REPORT')
@@ -140,8 +162,7 @@ async def sections(report_id:UUID,ctx:RequestContext=Depends(current_context),db
 
 async def queue_ai(db,ctx,project_id,task_type,target_type,target_id):
     t=await TaskService(db).create(ctx.tenant_id,project_id,ctx.user_id,task_type,target_type,target_id); await db.commit()
-    try: run_ai_task.delay(str(t.id))
-    except AttributeError: pass
+    run_ai_task.delay(str(t.id), str(ctx.tenant_id))
     return {'task_id':t.id,'status':t.status}
 @router.post('/document-versions/{version_id}/extract-facts',status_code=202,tags=['AI'])
 async def extract_facts(version_id:UUID,ctx:RequestContext=Depends(current_context),db=Depends(get_db)):
@@ -160,8 +181,6 @@ async def task(task_id:UUID,ctx:RequestContext=Depends(current_context),db=Depen
     if not t or t.tenant_id!=ctx.tenant_id: raise NotFound('TASK_NOT_FOUND','Task not found')
     if t.project_id: await ProjectAccess(db).require(t.project_id,ctx.membership_id,'VIEW_PROJECT')
     return t
-
-from app.modules.services import StandardService, ReportService
 
 @router.get('/projects/{project_id}/fact-conflicts',tags=['Facts'])
 async def fact_conflicts(project_id:UUID,ctx:RequestContext=Depends(current_context),db=Depends(get_db)):
@@ -189,8 +208,7 @@ async def attach_standard(project_id:UUID,version_id:UUID,ctx:RequestContext=Dep
 @router.post('/projects/{project_id}/ai/disclosure-mapping',status_code=202,tags=['AI'])
 async def disclosure_mapping(project_id:UUID,ctx:RequestContext=Depends(current_context),db=Depends(get_db)):
     await ProjectAccess(db).require(project_id,ctx.membership_id,'EDIT_PROJECT')
-    count=await StandardService(db).map_confirmed_facts(project_id); await db.commit()
-    return {'status':'SUCCESS','mappings_created':count}
+    return await queue_ai(db,ctx,project_id,'DISCLOSURE_MAPPING','PROJECT',project_id)
 
 @router.get('/projects/{project_id}/disclosures',tags=['Standards'])
 async def project_disclosures(project_id:UUID,ctx:RequestContext=Depends(current_context),db=Depends(get_db)):
@@ -209,8 +227,7 @@ async def project_requirements(project_id:UUID,ctx:RequestContext=Depends(curren
 @router.post('/projects/{project_id}/ai/missing-data-analysis',status_code=202,tags=['AI'])
 async def missing_analysis(project_id:UUID,ctx:RequestContext=Depends(current_context),db=Depends(get_db)):
     await ProjectAccess(db).require(project_id,ctx.membership_id,'EDIT_PROJECT')
-    items=await StandardService(db).generate_missing_items(ctx.tenant_id,project_id); await db.commit()
-    return {'status':'SUCCESS','missing_items_created':len(items)}
+    return await queue_ai(db,ctx,project_id,'MISSING_DATA_ANALYSIS','PROJECT',project_id)
 
 @router.get('/projects/{project_id}/missing-items',tags=['Standards'])
 async def missing_items(project_id:UUID,ctx:RequestContext=Depends(current_context),db=Depends(get_db)):
@@ -262,15 +279,33 @@ async def consistency_check(report_id:UUID,ctx:RequestContext=Depends(current_co
     r=await db.get(Report,report_id)
     if not r: raise NotFound('REPORT_NOT_FOUND','Report not found')
     await ProjectAccess(db).require(r.project_id,ctx.membership_id,'VIEW_PROJECT')
-    return {'status':'SUCCESS','issues':await ReportService(db).consistency(report_id)}
+    return await queue_ai(db,ctx,r.project_id,'CONSISTENCY_CHECK','REPORT',report_id)
 
 from app.integrations.export import render_docx
-@router.post('/reports/{report_id}/exports',status_code=201,tags=['Reports'])
-async def export_report(report_id:UUID,format:str='DOCX',ctx:RequestContext=Depends(current_context),db=Depends(get_db)):
+@router.post('/reports/{report_id}/exports',status_code=202,tags=['Reports'])
+async def export_report(report_id:UUID,body:ExportRequest,ctx:RequestContext=Depends(current_context),db=Depends(get_db)):
     r=await db.get(Report,report_id)
     if not r: raise NotFound('REPORT_NOT_FOUND','Report not found')
     await ProjectAccess(db).require(r.project_id,ctx.membership_id,'VIEW_PROJECT')
-    if format.upper()!='DOCX': raise DomainError('EXPORT_FORMAT_UNSUPPORTED','Only DOCX is supported in MVP',422)
-    data=await render_docx(db,report_id); key=f'tenants/{ctx.tenant_id}/projects/{r.project_id}/reports/{report_id}/exports/{datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")}.docx'; await storage().put(key,data,'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
-    e=ReportExport(report_id=report_id,format='DOCX',status='SUCCESS',object_key=key,created_by=ctx.user_id,completed_at=datetime.now(timezone.utc)); db.add(e); await db.commit(); await db.refresh(e)
-    return {'id':e.id,'status':e.status,'download_url':await storage().signed_download_url(key)}
+    if body.format.upper()!='DOCX': raise DomainError('EXPORT_FORMAT_UNSUPPORTED','Only DOCX is supported in MVP',422)
+    export=ReportExport(report_id=report_id,format='DOCX',status='PENDING',created_by=ctx.user_id); db.add(export); await db.flush()
+    task=await TaskService(db).create(ctx.tenant_id,r.project_id,ctx.user_id,'DOCX_EXPORT','REPORT_EXPORT',export.id)
+    await db.commit(); run_ai_task.delay(str(task.id), str(ctx.tenant_id))
+    return {'id':export.id,'status':export.status,'task_id':task.id}
+
+# Service acceptance extension routers
+from app.api.documents_ext import router as documents_ext_router
+from app.api.facts_ext import router as facts_ext_router
+from app.api.foundation_ext import router as foundation_ext_router
+from app.api.operations_ext import router as operations_ext_router
+from app.api.reports_ext import router as reports_ext_router
+from app.api.standards_ext import router as standards_ext_router
+from app.api.templates_ext import router as templates_ext_router
+
+router.include_router(foundation_ext_router)
+router.include_router(documents_ext_router)
+router.include_router(facts_ext_router)
+router.include_router(standards_ext_router)
+router.include_router(templates_ext_router)
+router.include_router(reports_ext_router)
+router.include_router(operations_ext_router)

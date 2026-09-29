@@ -1,32 +1,50 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from uuid import uuid4
+
 import jwt
-try:
-    from pwdlib import PasswordHash
-    _password_hash = PasswordHash.recommended()
-except Exception:
-    _password_hash = None
+from pwdlib import PasswordHash
+
 from app.core.config import get_settings
 
-settings=get_settings()
+settings = get_settings()
+_password_hash = PasswordHash.recommended()
+
 
 def hash_password(password: str) -> str:
-    if _password_hash:
-        return _password_hash.hash(password)
-    import hashlib
-    return 'dev$'+hashlib.sha256(password.encode()).hexdigest()
+    return _password_hash.hash(password)
+
 
 def verify_password(password: str, hashed: str) -> bool:
-    if _password_hash and not hashed.startswith('dev$'):
+    try:
         return _password_hash.verify(password, hashed)
-    import hashlib
-    return hashed == 'dev$'+hashlib.sha256(password.encode()).hexdigest()
+    except Exception:
+        return False
 
-def create_token(subject: str, tenant_id: str | None, membership_id: str | None, token_type='access') -> str:
-    now=datetime.now(timezone.utc)
-    delta=timedelta(minutes=settings.jwt_access_token_minutes) if token_type=='access' else timedelta(days=settings.jwt_refresh_token_days)
-    payload={'sub':subject,'tenant_id':tenant_id,'membership_id':membership_id,'type':token_type,'iat':now,'exp':now+delta}
-    return jwt.encode(payload, settings.jwt_secret, algorithm='HS256')
+
+def create_token(
+    subject: str,
+    tenant_id: str | None,
+    membership_id: str | None,
+    token_type: str = "access",
+) -> str:
+    now = datetime.now(timezone.utc)
+    delta = (
+        timedelta(minutes=settings.jwt_access_token_minutes)
+        if token_type == "access"
+        else timedelta(days=settings.jwt_refresh_token_days)
+    )
+    payload = {
+        "sub": subject,
+        "tenant_id": tenant_id,
+        "membership_id": membership_id,
+        "type": token_type,
+        "jti": str(uuid4()),
+        "iat": now,
+        "exp": now + delta,
+    }
+    return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
+
 
 def decode_token(token: str) -> dict[str, Any]:
-    return jwt.decode(token, settings.jwt_secret, algorithms=['HS256'])
+    return jwt.decode(token, settings.jwt_secret, algorithms=["HS256"])
