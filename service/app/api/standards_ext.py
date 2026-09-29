@@ -38,7 +38,7 @@ async def _queue(
         project_id,
     )
     await db.commit()
-    run_ai_task.delay(str(task.id))
+    run_ai_task.delay(str(task.id), str(ctx.tenant_id))
     return {"task_id": task.id, "status": task.status}
 
 
