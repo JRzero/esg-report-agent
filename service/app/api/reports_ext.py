@@ -15,6 +15,7 @@ from app.modules.models import (
     Comment,
     Report,
     ReportBlock,
+    ReportBlockRevision,
     ReportExport,
     ReportSection,
     SectionDisclosureMap,
@@ -246,7 +247,7 @@ async def verify_report_claim(
     claim = await db.get(Claim, claim_id)
     if not claim:
         raise NotFound("CLAIM_NOT_FOUND", "Claim not found")
-    revision = await db.get(__import__("app.modules.models", fromlist=["ReportBlockRevision"]).ReportBlockRevision, claim.block_revision_id)
+    revision = await db.get(ReportBlockRevision, claim.block_revision_id)
     block = await db.get(ReportBlock, revision.block_id) if revision else None
     if not block:
         raise NotFound("CLAIM_NOT_FOUND", "Claim not found")
