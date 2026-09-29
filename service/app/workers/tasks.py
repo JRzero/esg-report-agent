@@ -11,7 +11,7 @@ from app.ai.workflows import (
     SectionWritingWorkflow,
 )
 from app.core.config import get_settings
-from app.core.database import SessionLocal
+from app.core.database import SessionLocal, set_tenant_context
 from app.integrations.export import render_docx
 from app.integrations.parsers import parse_document
 from app.integrations.storage import storage
@@ -32,12 +32,13 @@ from app.workers.celery_app import celery_app
 
 
 @celery_app.task(name="app.workers.tasks.process_document")
-def process_document(version_id: str):
-    return asyncio.run(_process_document(UUID(version_id)))
+def process_document(version_id: str, tenant_id: str):
+    return asyncio.run(_process_document(UUID(version_id), UUID(tenant_id)))
 
 
-async def _process_document(version_id: UUID) -> int:
+async def _process_document(version_id: UUID, tenant_id: UUID) -> int:
     async with SessionLocal() as session:
+        await set_tenant_context(session, str(tenant_id))
         version = await session.get(DocumentVersion, version_id)
         document = await session.get(Document, version.document_id) if version else None
         if not version or not document:
@@ -91,14 +92,15 @@ async def _process_document(version_id: UUID) -> int:
     # Context indexing is independent from evidence parsing and may fail/retry
     # without invalidating immutable anchors.
     try:
-        await _reindex_context(version_id)
+        await _reindex_context(version_id, tenant_id)
     except Exception:
         pass
     return len(anchors)
 
 
-async def _reindex_context(version_id: UUID) -> dict:
+async def _reindex_context(version_id: UUID, tenant_id: UUID) -> dict:
     async with SessionLocal() as session:
+        await set_tenant_context(session, str(tenant_id))
         version = await session.get(DocumentVersion, version_id)
         document = await session.get(Document, version.document_id) if version else None
         if not version or not document:
@@ -196,12 +198,13 @@ async def _run_export(session, task: AITask) -> dict:
 
 
 @celery_app.task(name="app.workers.tasks.run_ai_task")
-def run_ai_task(task_id: str):
-    return asyncio.run(_run_ai_task(UUID(task_id)))
+def run_ai_task(task_id: str, tenant_id: str):
+    return asyncio.run(_run_ai_task(UUID(task_id), UUID(tenant_id)))
 
 
-async def _run_ai_task(task_id: UUID):
+async def _run_ai_task(task_id: UUID, tenant_id: UUID):
     async with SessionLocal() as session:
+        await set_tenant_context(session, str(tenant_id))
         task = await session.get(AITask, task_id)
         if not task:
             raise RuntimeError("Task not found")
@@ -219,9 +222,9 @@ async def _run_ai_task(task_id: UUID):
         try:
             result: object
             if task.task_type == "DOCUMENT_PROCESS":
-                result = {"anchors": await _process_document(task.target_id)}
+                result = {"anchors": await _process_document(task.target_id, tenant_id)}
             elif task.task_type == "CONTEXT_REINDEX":
-                result = await _reindex_context(task.target_id)
+                result = await _reindex_context(task.target_id, tenant_id)
             elif task.task_type == "FACT_EXTRACTION":
                 version = await session.get(DocumentVersion, task.target_id)
                 if version:
