@@ -1,0 +1,70 @@
+name: Service CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "service/**"
+      - "specs/**"
+      - ".github/workflows/service-ci.yml"
+  pull_request:
+    paths:
+      - "service/**"
+      - "specs/**"
+      - ".github/workflows/service-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  service:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: esg
+          POSTGRES_USER: esg
+          POSTGRES_PASSWORD: esg
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U esg -d esg"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
+    defaults:
+      run:
+        working-directory: service
+
+    env:
+      DATABASE_URL: postgresql+asyncpg://esg:esg@localhost:5432/esg
+      APP_ENV: test
+      JWT_SECRET: ci-test-secret
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Ruff
+        run: uv run ruff check app tests migrations scripts
+
+      - name: Compile
+        run: uv run python -m compileall -q app migrations scripts
+
+      - name: Database migration
+        run: uv run alembic upgrade head
+
+      - name: Tests
+        run: uv run pytest -q
