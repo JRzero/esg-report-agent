@@ -16,4 +16,4 @@ async def current_context(creds:HTTPAuthorizationCredentials|None=Depends(bearer
     uid=UUID(p['sub']); tid=UUID(p['tenant_id']); mid=UUID(p['membership_id'])
     m=await db.scalar(select(TenantMembership).where(TenantMembership.id==mid,TenantMembership.user_id==uid,TenantMembership.tenant_id==tid,TenantMembership.status=='ACTIVE'))
     if not m: raise DomainError('AUTH_INVALID_MEMBERSHIP','Membership is not active',401)
-    await set_tenant_context(db,str(tid)); return RequestContext(uid,tid,mid,m.tenant_role)
+    await set_tenant_context(db,str(tid)); return RequestContext(uid,tid,mid,m.tenant_role,m.member_type,m.company_id)
