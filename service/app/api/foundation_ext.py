@@ -68,6 +68,9 @@ async def get_company(
     ctx: RequestContext = Depends(current_context),
     db: AsyncSession = Depends(get_db),
 ):
+    if ctx.member_type == "CLIENT" and ctx.company_id != company_id:
+        from app.core.errors import NotFound
+        raise NotFound("COMPANY_NOT_FOUND", "Company not found")
     return await CompanyLifecycle(db).get(ctx.tenant_id, company_id)
 
 
