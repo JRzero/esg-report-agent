@@ -58,7 +58,12 @@ async def create_tenant_member(body:UserCreate,ctx:RequestContext=Depends(curren
     return {'user':UserRead.model_validate(user),'membership':MembershipRead.model_validate(membership)}
 
 @router.get('/companies',response_model=list[CompanyRead],tags=['Companies'])
-async def companies(ctx:RequestContext=Depends(current_context),db=Depends(get_db)): return await CompanyService(db).list(ctx.tenant_id)
+async def companies(ctx:RequestContext=Depends(current_context),db=Depends(get_db)):
+    if ctx.member_type=='CLIENT':
+        if not ctx.company_id: return []
+        try: return [await CompanyService(db).get(ctx.tenant_id,ctx.company_id)]
+        except NotFound: return []
+    return await CompanyService(db).list(ctx.tenant_id)
 @router.post('/companies',response_model=CompanyRead,status_code=201,tags=['Companies'])
 async def create_company(body:CompanyCreate,ctx:RequestContext=Depends(current_context),db=Depends(get_db)):
     if ctx.tenant_role!='ADMIN': raise Forbidden('TENANT_ADMIN_REQUIRED','Tenant admin required')
@@ -68,6 +73,7 @@ async def create_company(body:CompanyCreate,ctx:RequestContext=Depends(current_c
 async def projects(ctx:RequestContext=Depends(current_context),db=Depends(get_db)): return await ProjectService(db).list(ctx.tenant_id,ctx.membership_id)
 @router.post('/projects',response_model=ProjectRead,status_code=201,tags=['Projects'])
 async def create_project(body:ProjectCreate,ctx:RequestContext=Depends(current_context),db=Depends(get_db)):
+    if ctx.member_type!='INTERNAL': raise Forbidden('PROJECT_CREATE_DENIED','Client members cannot create projects')
     obj=await ProjectService(db).create(ctx.tenant_id,ctx.user_id,ctx.membership_id,body); await db.commit(); return obj
 @router.get('/projects/{project_id}',response_model=ProjectRead,tags=['Projects'])
 async def project(project_id:UUID,ctx:RequestContext=Depends(current_context),db=Depends(get_db)): return await ProjectService(db).get(ctx.tenant_id,project_id,ctx.membership_id)
