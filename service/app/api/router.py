@@ -103,7 +103,7 @@ async def upload_document(project_id:UUID,file:UploadFile=File(...),source_type:
         v.validation_status='FAILED'; v.parse_error=str(exc)[:4000]; await db.commit()
         raise DomainError('STORAGE_WRITE_FAILED','Failed to persist document',503) from exc
     task=await TaskService(db).create(ctx.tenant_id,project_id,ctx.user_id,'DOCUMENT_PROCESS','DOCUMENT_VERSION',v.id)
-    await db.commit(); run_ai_task.delay(str(task.id))
+    await db.commit(); run_ai_task.delay(str(task.id), str(ctx.tenant_id))
     return {'document_id':d.id,'version_id':v.id,'status':'UPLOADED','processing_task_id':task.id}
 
 @router.get('/document-versions/{version_id}/anchors',tags=['Documents'])
@@ -162,7 +162,7 @@ async def sections(report_id:UUID,ctx:RequestContext=Depends(current_context),db
 
 async def queue_ai(db,ctx,project_id,task_type,target_type,target_id):
     t=await TaskService(db).create(ctx.tenant_id,project_id,ctx.user_id,task_type,target_type,target_id); await db.commit()
-    run_ai_task.delay(str(t.id))
+    run_ai_task.delay(str(t.id), str(ctx.tenant_id))
     return {'task_id':t.id,'status':t.status}
 @router.post('/document-versions/{version_id}/extract-facts',status_code=202,tags=['AI'])
 async def extract_facts(version_id:UUID,ctx:RequestContext=Depends(current_context),db=Depends(get_db)):
@@ -290,7 +290,7 @@ async def export_report(report_id:UUID,body:ExportRequest,ctx:RequestContext=Dep
     if body.format.upper()!='DOCX': raise DomainError('EXPORT_FORMAT_UNSUPPORTED','Only DOCX is supported in MVP',422)
     export=ReportExport(report_id=report_id,format='DOCX',status='PENDING',created_by=ctx.user_id); db.add(export); await db.flush()
     task=await TaskService(db).create(ctx.tenant_id,r.project_id,ctx.user_id,'DOCX_EXPORT','REPORT_EXPORT',export.id)
-    await db.commit(); run_ai_task.delay(str(task.id))
+    await db.commit(); run_ai_task.delay(str(task.id), str(ctx.tenant_id))
     return {'id':export.id,'status':export.status,'task_id':task.id}
 
 # Service acceptance extension routers
