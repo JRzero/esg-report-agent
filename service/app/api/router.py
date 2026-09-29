@@ -274,3 +274,20 @@ async def export_report(report_id:UUID,format:str='DOCX',ctx:RequestContext=Depe
     data=await render_docx(db,report_id); key=f'tenants/{ctx.tenant_id}/projects/{r.project_id}/reports/{report_id}/exports/{datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")}.docx'; await storage().put(key,data,'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
     e=ReportExport(report_id=report_id,format='DOCX',status='SUCCESS',object_key=key,created_by=ctx.user_id,completed_at=datetime.now(timezone.utc)); db.add(e); await db.commit(); await db.refresh(e)
     return {'id':e.id,'status':e.status,'download_url':await storage().signed_download_url(key)}
+
+# Service acceptance extension routers
+from app.api.documents_ext import router as documents_ext_router
+from app.api.facts_ext import router as facts_ext_router
+from app.api.foundation_ext import router as foundation_ext_router
+from app.api.operations_ext import router as operations_ext_router
+from app.api.reports_ext import router as reports_ext_router
+from app.api.standards_ext import router as standards_ext_router
+from app.api.templates_ext import router as templates_ext_router
+
+router.include_router(foundation_ext_router)
+router.include_router(documents_ext_router)
+router.include_router(facts_ext_router)
+router.include_router(standards_ext_router)
+router.include_router(templates_ext_router)
+router.include_router(reports_ext_router)
+router.include_router(operations_ext_router)
