@@ -48,7 +48,7 @@ CHILD_POLICIES = {
     "claim": "EXISTS (SELECT 1 FROM report_block_revision r JOIN report_block b ON b.id = r.block_id WHERE r.id = block_revision_id AND b.tenant_id = app_current_tenant())",
     "citation": "EXISTS (SELECT 1 FROM claim c JOIN report_block_revision r ON r.id = c.block_revision_id JOIN report_block b ON b.id = r.block_id WHERE c.id = claim_id AND b.tenant_id = app_current_tenant())",
     "ai_trace": "EXISTS (SELECT 1 FROM ai_task t WHERE t.id = ai_task_id AND t.tenant_id = app_current_tenant())",
-    "ai_trace_context": "EXISTS (SELECT 1 FROM ai_trace tr JOIN ai_task t ON t.id = tr.ai_task_id WHERE tr.id = trace_id AND t.tenant_id = app_current_tenant())",
+    "ai_trace_context": "EXISTS (SELECT 1 FROM ai_trace tr JOIN ai_task t ON t.id = tr.ai_task_id WHERE tr.id = \"ai_trace_context\".trace_id AND t.tenant_id = app_current_tenant())",
     "report_export": "EXISTS (SELECT 1 FROM report r WHERE r.id = report_id AND r.tenant_id = app_current_tenant())",
 }
 
