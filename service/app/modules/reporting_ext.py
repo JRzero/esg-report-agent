@@ -338,3 +338,108 @@ async def get_export(session: AsyncSession, export_id: UUID):
     if not item:
         raise NotFound("EXPORT_NOT_FOUND", "Report export not found")
     return item
+
+
+class AgentReportWriter:
+    """Persistence boundary used by Agent workflows.
+
+    Agent code may reason and call external models, but all report mutations pass
+    through this service so revision/citation invariants stay centralized.
+    """
+
+    def __init__(self, session: AsyncSession):
+        self.s = session
+
+    async def apply_plan(self, section_id: UUID, plan: dict):
+        section = await self.s.get(ReportSection, section_id)
+        if not section:
+            raise NotFound("SECTION_NOT_FOUND", "Section not found")
+        version = int((section.writing_plan or {}).get("version", 0)) + 1
+        section.writing_plan = {"version": version, **plan}
+        return section.writing_plan
+
+    async def apply_draft(
+        self,
+        tenant_id: UUID,
+        project_id: UUID,
+        user_id: UUID,
+        section_id: UUID,
+        draft,
+        facts: list,
+    ):
+        from app.modules.models import FactEvidence
+
+        section = await self.s.get(ReportSection, section_id)
+        if not section or section.project_id != project_id:
+            raise NotFound("SECTION_NOT_FOUND", "Section not found")
+        existing_max = (
+            await self.s.scalar(
+                select(func.max(ReportBlock.sort_order)).where(
+                    ReportBlock.section_id == section_id,
+                    ReportBlock.deleted_at.is_(None),
+                )
+            )
+            or -1
+        )
+        fact_map = {fact.id: fact for fact in facts}
+        blocks = []
+        order = existing_max + 1
+        for draft_block in draft.blocks:
+            block = ReportBlock(
+                tenant_id=tenant_id,
+                project_id=project_id,
+                section_id=section_id,
+                block_type=draft_block.type,
+                sort_order=order,
+                current_content=draft_block.content,
+                current_content_json={},
+                current_revision_no=1,
+                source_type="AI",
+                created_by=user_id,
+                updated_by=user_id,
+            )
+            order += 1
+            self.s.add(block)
+            await self.s.flush()
+            revision = ReportBlockRevision(
+                block_id=block.id,
+                revision_no=1,
+                content=draft_block.content,
+                content_json={},
+                source_type="AI",
+                created_by=user_id,
+            )
+            self.s.add(revision)
+            await self.s.flush()
+            for claim_draft in draft_block.claims:
+                claim = Claim(
+                    block_revision_id=revision.id,
+                    claim_text=claim_draft.text,
+                    claim_type=claim_draft.claim_type,
+                    risk_level=claim_draft.risk_level,
+                )
+                self.s.add(claim)
+                await self.s.flush()
+                verified = False
+                for fact_id in claim_draft.fact_ids:
+                    fact = fact_map.get(fact_id)
+                    if not fact:
+                        continue
+                    evidence = await self.s.scalar(
+                        select(FactEvidence).where(FactEvidence.fact_id == fact_id).limit(1)
+                    )
+                    self.s.add(
+                        Citation(
+                            claim_id=claim.id,
+                            citation_type="FACT",
+                            fact_id=fact_id,
+                            fact_evidence_id=evidence.id if evidence else None,
+                            document_anchor_id=evidence.document_anchor_id if evidence else None,
+                            created_by=user_id,
+                        )
+                    )
+                    verified = verified or bool(evidence or fact.source_type == "HUMAN")
+                claim.verification_status = "VERIFIED" if verified else "UNVERIFIED"
+            blocks.append(block)
+        section.status = "DRAFT"
+        return blocks
