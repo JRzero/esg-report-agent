@@ -33,6 +33,15 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
 
     defaults:
       run:
@@ -40,11 +49,32 @@ jobs:
 
     env:
       DATABASE_URL: postgresql+asyncpg://esg:esg@localhost:5432/esg
+      REDIS_URL: redis://localhost:6379/0
+      STORAGE_BACKEND: minio
+      MINIO_ENDPOINT: localhost:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: esg-report-ci
+      MINIO_SECURE: "false"
       APP_ENV: test
       JWT_SECRET: ci-test-secret
+      OPENVIKING_BASE_URL: http://127.0.0.1:1933
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Start MinIO
+        working-directory: .
+        run: |
+          docker run -d --name esg-minio             -p 9000:9000             -e MINIO_ROOT_USER=minioadmin             -e MINIO_ROOT_PASSWORD=minioadmin             minio/minio:latest server /data
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:9000/minio/health/live >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs esg-minio
+          exit 1
 
       - name: Set up Python
         uses: actions/setup-python@v5
