@@ -480,3 +480,17 @@ class AuditLog(UUIDPKMixin, Base):
     after_data: Mapped[dict|None]=mapped_column(JSON, nullable=True)
     request_id: Mapped[str|None]=mapped_column(String(120), nullable=True)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+
+
+class Comment(UUIDPKMixin, TimestampMixin, Base):
+    __tablename__='comment'
+    tenant_id: Mapped[UUID]=mapped_column(ForeignKey('tenant.id'), index=True)
+    project_id: Mapped[UUID]=mapped_column(ForeignKey('project.id'), index=True)
+    section_id: Mapped[UUID|None]=mapped_column(ForeignKey('report_section.id'), nullable=True, index=True)
+    block_id: Mapped[UUID|None]=mapped_column(ForeignKey('report_block.id'), nullable=True, index=True)
+    parent_id: Mapped[UUID|None]=mapped_column(ForeignKey('comment.id'), nullable=True)
+    author_user_id: Mapped[UUID]=mapped_column(ForeignKey('app_user.id'), index=True)
+    body: Mapped[str]=mapped_column(Text)
+    status: Mapped[str]=mapped_column(String(30), default='OPEN', index=True)
+    resolved_by: Mapped[UUID|None]=mapped_column(ForeignKey('app_user.id'), nullable=True)
+    resolved_at: Mapped[datetime|None]=mapped_column(DateTime(timezone=True), nullable=True)
