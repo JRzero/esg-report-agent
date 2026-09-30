@@ -41,7 +41,7 @@ jobs:
     env:
       DATABASE_URL: postgresql+asyncpg://esg:esg@localhost:5432/esg
       APP_ENV: test
-      JWT_SECRET: ci-test-secret
+      JWT_SECRET: ci-test-secret-0123456789-abcdef
 
     steps:
       - uses: actions/checkout@v4
