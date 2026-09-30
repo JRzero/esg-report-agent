@@ -56,7 +56,11 @@ def evaluate_scenario_draft(scenario: ESGScenario, draft: SectionDraft) -> Scena
     allowed_fact_ids = {fact.id for fact in scenario.facts}
     grounding = validate_section_draft(draft, allowed_fact_ids)
 
-    numeric_values: list[Any] = [fact.value for fact in scenario.facts]
+    numeric_values: list[Any] = []
+    for fact in scenario.facts:
+        numeric_values.append(fact.value)
+        if fact.unit == "%":
+            numeric_values.append(f"{fact.value}%")
     numeric_values.extend(scenario.expectations.allowed_context_numbers)
     numeric_values.append(scenario.report_year)
     numeric = numeric_faithfulness(draft, numeric_values)
