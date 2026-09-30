@@ -4,7 +4,6 @@ Revision ID: 0003_document_processing_started
 Revises: 0002_task_idempotency_scope
 """
 from alembic import op
-import sqlalchemy as sa
 
 revision = "0003_document_processing_started"
 down_revision = "0002_task_idempotency_scope"
@@ -13,11 +12,18 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column(
-        "document_version",
-        sa.Column("processing_started_at", sa.DateTime(timezone=True), nullable=True),
+    op.execute(
+        """
+        ALTER TABLE document_version
+        ADD COLUMN IF NOT EXISTS processing_started_at TIMESTAMPTZ NULL
+        """
     )
 
 
 def downgrade():
-    op.drop_column("document_version", "processing_started_at")
+    op.execute(
+        """
+        ALTER TABLE document_version
+        DROP COLUMN IF EXISTS processing_started_at
+        """
+    )
