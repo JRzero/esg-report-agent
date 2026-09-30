@@ -6,7 +6,7 @@
       "allowed_fact_ids": [
         "11111111-1111-1111-1111-111111111111"
       ],
-      "allowed_numeric_values": [1287],
+      "allowed_numeric_values": [1287, 2026],
       "draft": {
         "blocks": [
           {
