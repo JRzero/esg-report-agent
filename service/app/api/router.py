@@ -58,6 +58,7 @@ from app.modules.schemas import (
     FactCreate,
     FactRejectRequest,
     FactUpdate,
+    LoginRequest,
     MembershipRead,
     MissingItemUpdate,
     ProjectCreate,
@@ -125,7 +126,7 @@ async def _block(db: AsyncSession, block_id: UUID) -> ReportBlock:
 
 
 @router.post("/auth/login", response_model=TokenResponse, tags=["Auth"])
-async def login(body, db: AsyncSession = Depends(get_db)):
+async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     user, membership = await IdentityService(db).authenticate(body.email, body.password)
     access = create_token(str(user.id), str(membership.tenant_id), str(membership.id), "access")
     refresh_token = create_token(str(user.id), str(membership.tenant_id), str(membership.id), "refresh")
