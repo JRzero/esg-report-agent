@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     openviking_enabled: bool = False
     openviking_base_url: str = "http://localhost:1933"
     openviking_api_key: str = ""
+    openviking_upload_mode: str = "local"
     openviking_reconcile_max_retries: int = Field(default=20, ge=1, le=1000)
 
     llm_base_url: str = ""
@@ -58,6 +59,8 @@ class Settings(BaseSettings):
                 raise ValueError("Default MinIO credentials are forbidden outside development/test")
         if self.openviking_enabled and not self.openviking_base_url.startswith(("http://", "https://")):
             raise ValueError("OPENVIKING_BASE_URL must use http or https")
+        if self.openviking_upload_mode not in {"local", "shared"}:
+            raise ValueError("OPENVIKING_UPLOAD_MODE must be local or shared")
         if self.llm_base_url and not self.llm_base_url.startswith(("http://", "https://")):
             raise ValueError("LLM_BASE_URL must use http or https")
         if self.storage_backend not in {"local", "minio"}:
