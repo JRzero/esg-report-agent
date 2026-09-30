@@ -3,8 +3,7 @@ Revision ID: 0001_initial
 Revises: None
 """
 from alembic import op
-from app.core.database import Base
-from app.modules import models  # noqa: F401
+from migrations.schema_v1 import Base
 revision='0001_initial'
 down_revision=None
 branch_labels=None
