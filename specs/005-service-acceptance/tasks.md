@@ -1,0 +1,21 @@
+# Tasks
+
+- [ ] Harden schemas and validation
+- [ ] Complete Company/Project/Project Member lifecycle
+- [ ] Complete Document/DocumentVersion lifecycle
+- [ ] Complete Fact lifecycle and evidence guards
+- [ ] Complete Missing Item lifecycle
+- [ ] Complete template/report/section/block lifecycle
+- [ ] Add claim verification
+- [ ] Add task list/retry/cancel
+- [ ] Add audit query endpoint
+- [ ] Add dependency readiness checks
+- [ ] Add PostgreSQL integration fixtures
+- [ ] Add RBAC/tenant isolation tests
+- [ ] Add Evidence-to-Fact E2E
+- [ ] Add GRI coverage/missing-data E2E
+- [ ] Add Report/Claim/Citation/DOCX E2E
+- [ ] Add OpenViking adapter contract test
+- [ ] Add LLM adapter contract test
+- [ ] Add acceptance CI workflow
+- [ ] Publish acceptance report
