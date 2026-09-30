@@ -90,6 +90,7 @@ from app.modules.services import (
     StandardService,
     TaskService,
     TemplateService,
+    TenantService,
 )
 from app.workers.tasks import process_document, run_ai_task
 
