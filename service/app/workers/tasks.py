@@ -90,8 +90,14 @@ async def _process_document(version_id: str):
             )
             session.add(binding)
             await session.flush()
-        binding.processing_status = "PROCESSING"
         binding.last_error = None
+        adapter = OpenVikingAdapter()
+        if not adapter.enabled:
+            binding.processing_status = "DISABLED"
+            version.context_status = "DISABLED"
+            await session.commit()
+            return
+        binding.processing_status = "PROCESSING"
         await session.commit()
 
         try:
@@ -105,7 +111,7 @@ async def _process_document(version_id: str):
                 f"viking://resources/projects/{document.project_id}/"
                 f"{source_segment}/{category}/{version.id}-{version.original_filename}"
             )
-            result = await OpenVikingAdapter().add_bytes(version.original_filename, data, target)
+            result = await adapter.add_bytes(version.original_filename, data, target)
             binding.uri = result.get("root_uri", target)
             binding.external_task_id = result.get("task_id")
             binding.processing_status = "PROCESSING" if binding.external_task_id else "READY"
