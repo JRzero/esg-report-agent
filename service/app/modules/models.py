@@ -100,6 +100,7 @@ class DocumentVersion(UUIDPKMixin, Base):
     classification_status: Mapped[str]=mapped_column(String(30), default='PENDING')
     fact_extraction_status: Mapped[str]=mapped_column(String(30), default='PENDING')
     parse_error: Mapped[str|None]=mapped_column(Text, nullable=True)
+    processing_started_at: Mapped[datetime|None]=mapped_column(DateTime(timezone=True), nullable=True)
     uploaded_by: Mapped[UUID]=mapped_column(ForeignKey('app_user.id'))
     uploaded_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
