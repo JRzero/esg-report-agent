@@ -1,15 +1,4 @@
-"""Optional live smoke checks for external AI/context providers.
-
-Usage:
-  RUN_LIVE_INTEGRATIONS=true uv run python scripts/live_integrations.py
-
-Required for LLM smoke:
-  LLM_BASE_URL, LLM_MODEL (LLM_API_KEY when provider requires it)
-
-Required for OpenViking smoke:
-  OPENVIKING_ENABLED=true, OPENVIKING_BASE_URL
-  OPENVIKING_API_KEY when configured by the server
-"""
+"""Optional live smoke checks for external AI/context providers."""
 import asyncio
 import os
 from uuid import uuid4
@@ -35,7 +24,7 @@ async def main() -> None:
     if settings.llm_base_url:
         result = await LLMGateway().generate_structured(
             "Return valid JSON only.",
-            'Return {"answer":"ok"}.',
+            '{"answer":"ok"}',
             SmokeAnswer,
         )
         if result.answer.lower() != "ok":
@@ -46,8 +35,12 @@ async def main() -> None:
 
     if settings.openviking_enabled:
         adapter = OpenVikingAdapter()
+        if not await adapter.ready():
+            raise RuntimeError("OpenViking /ready did not report ready")
+
         marker = uuid4().hex
-        target = f"viking://resources/projects/live-smoke/evidence/{marker}/smoke.txt"
+        root = "viking://resources/tenants/live-smoke/projects/smoke/evidence"
+        target = f"{root}/{marker}/smoke.txt"
         result = await adapter.add_bytes(
             "smoke.txt",
             f"ESG live smoke {marker}".encode(),
@@ -56,14 +49,24 @@ async def main() -> None:
         )
         task_id = result.get("task_id")
         if task_id:
-            await adapter.get_task(task_id)
-        rows = await adapter.find(
-            marker,
-            "viking://resources/projects/live-smoke/evidence",
-            limit=5,
-        )
-        if not isinstance(rows, list):
-            raise RuntimeError("OpenViking search did not return a result list")
+            timeout = int(os.getenv("LIVE_OPENVIKING_TIMEOUT_SECONDS", "120"))
+            deadline = asyncio.get_running_loop().time() + timeout
+            while True:
+                task = await adapter.get_task(task_id)
+                status = str(task.get("status", "")).lower()
+                if status == "completed":
+                    break
+                if status in {"failed", "cancelled"}:
+                    raise RuntimeError(
+                        f"OpenViking import {status}: {task.get('error') or 'unknown error'}"
+                    )
+                if asyncio.get_running_loop().time() >= deadline:
+                    raise TimeoutError(f"OpenViking import did not complete within {timeout}s")
+                await asyncio.sleep(2)
+
+        rows = await adapter.find(marker, root, limit=5)
+        if not any(marker in (row.content or row.abstract or "") for row in rows):
+            raise RuntimeError("OpenViking smoke resource was not retrievable after import completion")
         results["openviking"] = "PASS"
     else:
         results["openviking"] = "SKIPPED_DISABLED"
