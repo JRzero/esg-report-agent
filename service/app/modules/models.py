@@ -410,7 +410,7 @@ class MissingItem(UUIDPKMixin, TimestampMixin, Base):
 
 class AITask(UUIDPKMixin, Base):
     __tablename__='ai_task'
-    __table_args__=(UniqueConstraint('tenant_id','idempotency_key'),)
+    __table_args__=(UniqueConstraint('tenant_id','created_by','idempotency_key', name='uq_ai_task_principal_idempotency'),)
     tenant_id: Mapped[UUID]=mapped_column(ForeignKey('tenant.id'), index=True)
     project_id: Mapped[UUID|None]=mapped_column(ForeignKey('project.id'), nullable=True, index=True)
     task_type: Mapped[str]=mapped_column(String(60), index=True)
