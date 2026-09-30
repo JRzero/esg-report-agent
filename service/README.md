@@ -104,3 +104,28 @@ will consume the stable `/api/v1` contract from the repository-root `web/` direc
 ## Production hardening
 
 Production-oriented concurrency, recovery, migration, security, container and performance acceptance is documented in `../docs/service-production-hardening-report.md`. Deployment and external-integration smoke runners live under `scripts/`.
+
+
+## Agent Eval
+
+Deterministic ESG AI quality checks are part of CI:
+
+```bash
+uv run python scripts/run_evals.py --min-score 1.0
+```
+
+Current gates cover:
+
+- Fact extraction evidence-anchor grounding
+- writing-plan Fact-ID grounding
+- section factual-claim grounding
+- hallucinated Fact-ID rejection
+- numeric-faithfulness golden cases
+
+Optional live model evaluation:
+
+```bash
+uv run python scripts/run_evals.py --live
+```
+
+See `../docs/agent-eval-acceptance-report.md`.

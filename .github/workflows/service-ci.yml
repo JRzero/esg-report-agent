@@ -90,6 +90,9 @@ jobs:
       - name: Tests
         run: uv run pytest -q
 
+      - name: Agent eval gate
+        run: uv run python scripts/run_evals.py --min-score 1.0
+
       - name: Performance smoke
         run: PERF_IN_PROCESS=true PERF_REQUESTS=100 PERF_CONCURRENCY=20 PERF_MAX_P95_MS=1000 uv run python scripts/perf_smoke.py
 
