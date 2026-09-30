@@ -410,6 +410,7 @@ class MissingItem(UUIDPKMixin, TimestampMixin, Base):
 
 class AITask(UUIDPKMixin, Base):
     __tablename__='ai_task'
+    __table_args__=(UniqueConstraint('tenant_id','idempotency_key'),)
     tenant_id: Mapped[UUID]=mapped_column(ForeignKey('tenant.id'), index=True)
     project_id: Mapped[UUID|None]=mapped_column(ForeignKey('project.id'), nullable=True, index=True)
     task_type: Mapped[str]=mapped_column(String(60), index=True)
@@ -423,7 +424,7 @@ class AITask(UUIDPKMixin, Base):
     error_code: Mapped[str|None]=mapped_column(String(120), nullable=True)
     error_message: Mapped[str|None]=mapped_column(Text, nullable=True)
     trace_id: Mapped[str|None]=mapped_column(String(120), nullable=True, index=True)
-    idempotency_key: Mapped[str|None]=mapped_column(String(500), nullable=True, unique=True)
+    idempotency_key: Mapped[str|None]=mapped_column(String(500), nullable=True)
     created_by: Mapped[UUID|None]=mapped_column(ForeignKey('app_user.id'), nullable=True)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     started_at: Mapped[datetime|None]=mapped_column(DateTime(timezone=True), nullable=True)
