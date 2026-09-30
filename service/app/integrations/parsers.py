@@ -27,39 +27,73 @@ class AnchorData:
         return sha256((locator + "|" + self.raw_text).encode()).hexdigest()
 
 
-def parse_xlsx(data: bytes) -> list[AnchorData]:
+class AnchorCollector:
+    def __init__(self, max_anchors: int, max_text_chars: int):
+        self.max_anchors = max_anchors
+        self.max_text_chars = max_text_chars
+        self.text_chars = 0
+        self.items: list[AnchorData] = []
+
+    def add(self, anchor: AnchorData) -> None:
+        next_count = len(self.items) + 1
+        next_chars = self.text_chars + len(anchor.raw_text)
+        if next_count > self.max_anchors:
+            raise ValueError(f"Document exceeds maximum anchor count ({self.max_anchors})")
+        if next_chars > self.max_text_chars:
+            raise ValueError(f"Document exceeds maximum extracted text size ({self.max_text_chars})")
+        self.items.append(anchor)
+        self.text_chars = next_chars
+
+
+def parse_xlsx(
+    data: bytes,
+    max_anchors: int = 20000,
+    max_text_chars: int = 10_000_000,
+) -> list[AnchorData]:
     import openpyxl
 
-    workbook = openpyxl.load_workbook(BytesIO(data), data_only=False, read_only=True)
-    out = []
-    for worksheet in workbook.worksheets:
-        for row in worksheet.iter_rows():
-            values = [cell.value for cell in row]
-            row_context = [str(value) for value in values if value is not None][:20]
-            for cell in row:
-                if cell.value is None:
-                    continue
-                text = str(cell.value).strip()
-                if not text:
-                    continue
-                out.append(
-                    AnchorData(
-                        "EXCEL_CELL",
-                        text,
-                        sheet_name=worksheet.title,
-                        cell_range=cell.coordinate,
-                        metadata={"row_context": row_context},
+    workbook = openpyxl.load_workbook(
+        BytesIO(data),
+        data_only=False,
+        read_only=True,
+        keep_links=False,
+    )
+    collector = AnchorCollector(max_anchors, max_text_chars)
+    try:
+        for worksheet in workbook.worksheets:
+            for row in worksheet.iter_rows():
+                values = [cell.value for cell in row]
+                row_context = [str(value) for value in values if value is not None][:20]
+                for cell in row:
+                    if cell.value is None:
+                        continue
+                    text = str(cell.value).strip()
+                    if not text:
+                        continue
+                    collector.add(
+                        AnchorData(
+                            "EXCEL_CELL",
+                            text,
+                            sheet_name=worksheet.title,
+                            cell_range=cell.coordinate,
+                            metadata={"row_context": row_context},
+                        )
                     )
-                )
-    return out
+    finally:
+        workbook.close()
+    return collector.items
 
 
-def parse_docx(data: bytes) -> list[AnchorData]:
+def parse_docx(
+    data: bytes,
+    max_anchors: int = 20000,
+    max_text_chars: int = 10_000_000,
+) -> list[AnchorData]:
     from docx import Document
 
     document = Document(BytesIO(data))
+    collector = AnchorCollector(max_anchors, max_text_chars)
     headings: list[str] = []
-    out = []
     for index, paragraph in enumerate(document.paragraphs):
         text = paragraph.text.strip()
         if not text:
@@ -70,7 +104,7 @@ def parse_docx(data: bytes) -> list[AnchorData]:
             except (TypeError, ValueError):
                 level = 1
             headings = headings[: level - 1] + [text]
-        out.append(
+        collector.add(
             AnchorData(
                 "DOCX_PARAGRAPH",
                 text,
@@ -84,7 +118,7 @@ def parse_docx(data: bytes) -> list[AnchorData]:
             for col_index, value in enumerate(values):
                 if not value:
                     continue
-                out.append(
+                collector.add(
                     AnchorData(
                         "DOCX_TABLE_CELL",
                         value,
@@ -92,47 +126,63 @@ def parse_docx(data: bytes) -> list[AnchorData]:
                             "table_index": table_index,
                             "row_index": row_index,
                             "column_index": col_index,
-                            "row_context": values,
+                            "row_context": values[:20],
                         },
                     )
                 )
-    return out
+    return collector.items
 
 
-def parse_pdf(data: bytes) -> list[AnchorData]:
+def parse_pdf(
+    data: bytes,
+    max_anchors: int = 20000,
+    max_text_chars: int = 10_000_000,
+) -> list[AnchorData]:
     import fitz
 
     document = fitz.open(stream=data, filetype="pdf")
-    out = []
-    for page_number, page in enumerate(document):
-        for block in page.get_text("blocks"):
-            text = (block[4] or "").strip()
-            if not text:
-                continue
-            out.append(
-                AnchorData(
-                    "PDF_TEXT",
-                    text,
-                    page_start=page_number + 1,
-                    page_end=page_number + 1,
-                    bbox={"x0": block[0], "y0": block[1], "x1": block[2], "y1": block[3]},
+    collector = AnchorCollector(max_anchors, max_text_chars)
+    try:
+        for page_number, page in enumerate(document):
+            for block in page.get_text("blocks"):
+                text = (block[4] or "").strip()
+                if not text:
+                    continue
+                collector.add(
+                    AnchorData(
+                        "PDF_TEXT",
+                        text,
+                        page_start=page_number + 1,
+                        page_end=page_number + 1,
+                        bbox={
+                            "x0": block[0],
+                            "y0": block[1],
+                            "x1": block[2],
+                            "y1": block[3],
+                        },
+                    )
                 )
-            )
-    return out
+    finally:
+        document.close()
+    return collector.items
 
 
-def parse_pptx(data: bytes) -> list[AnchorData]:
+def parse_pptx(
+    data: bytes,
+    max_anchors: int = 20000,
+    max_text_chars: int = 10_000_000,
+) -> list[AnchorData]:
     from pptx import Presentation
 
     presentation = Presentation(BytesIO(data))
-    out = []
+    collector = AnchorCollector(max_anchors, max_text_chars)
     for slide_number, slide in enumerate(presentation.slides, start=1):
         for shape_index, shape in enumerate(slide.shapes):
             text = getattr(shape, "text", "")
             text = text.strip() if text else ""
             if not text:
                 continue
-            out.append(
+            collector.add(
                 AnchorData(
                     "PPTX_TEXT",
                     text,
@@ -140,29 +190,41 @@ def parse_pptx(data: bytes) -> list[AnchorData]:
                     metadata={"shape_index": shape_index},
                 )
             )
-    return out
+    return collector.items
 
 
-def parse_plain_text(data: bytes) -> list[AnchorData]:
+def parse_plain_text(
+    data: bytes,
+    max_anchors: int = 20000,
+    max_text_chars: int = 10_000_000,
+) -> list[AnchorData]:
     text = data.decode("utf-8-sig", errors="replace")
-    out = []
+    collector = AnchorCollector(max_anchors, max_text_chars)
     for index, line in enumerate(text.splitlines()):
         value = line.strip()
         if value:
-            out.append(AnchorData("PLAIN_TEXT", value, paragraph_start=index))
-    return out or [AnchorData("PLAIN_TEXT", text)]
+            collector.add(AnchorData("PLAIN_TEXT", value, paragraph_start=index))
+    if not collector.items and text:
+        collector.add(AnchorData("PLAIN_TEXT", text))
+    return collector.items
 
 
-def parse_document(filename: str, data: bytes) -> list[AnchorData]:
+def parse_document(
+    filename: str,
+    data: bytes,
+    max_anchors: int = 20000,
+    max_text_chars: int = 10_000_000,
+) -> list[AnchorData]:
     extension = Path(filename).suffix.lower()
+    kwargs = {"max_anchors": max_anchors, "max_text_chars": max_text_chars}
     if extension in {".xlsx", ".xlsm"}:
-        return parse_xlsx(data)
+        return parse_xlsx(data, **kwargs)
     if extension == ".docx":
-        return parse_docx(data)
+        return parse_docx(data, **kwargs)
     if extension == ".pdf":
-        return parse_pdf(data)
+        return parse_pdf(data, **kwargs)
     if extension == ".pptx":
-        return parse_pptx(data)
+        return parse_pptx(data, **kwargs)
     if extension in {".txt", ".md", ".csv"}:
-        return parse_plain_text(data)
+        return parse_plain_text(data, **kwargs)
     raise ValueError(f"Unsupported file type: {extension}")
