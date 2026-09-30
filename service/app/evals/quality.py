@@ -103,7 +103,7 @@ def validate_section_draft(
 
 
 def numeric_tokens(text: str) -> set[str]:
-    return set(re.findall(r"(?<![A-Za-z])\d[\d,]*(?:\.\d+)?%?", text))
+    return set(re.findall(r"(?<![A-Za-z])(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?%?", text))
 
 
 def normalized_number(value: Decimal | int | float | str) -> set[str]:

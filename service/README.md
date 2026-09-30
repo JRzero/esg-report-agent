@@ -129,3 +129,34 @@ uv run python scripts/run_evals.py --live
 ```
 
 See `../docs/agent-eval-acceptance-report.md`.
+
+
+## ESG Scenario Eval
+
+The scenario-level dataset covers 10 ESG domains and is part of CI:
+
+```bash
+uv run python scripts/run_esg_scenario_evals.py --min-score 1.0
+```
+
+It evaluates:
+
+- confirmed-Fact grounding
+- numeric faithfulness
+- missing-data discipline
+- unsupported assertions
+- required Fact coverage
+
+Optional real-model evaluation:
+
+```bash
+uv run python scripts/run_esg_scenario_evals.py --live
+```
+
+For a smaller live smoke:
+
+```bash
+uv run python scripts/run_esg_scenario_evals.py --live --live-limit 3
+```
+
+See `../docs/esg-golden-dataset-eval-report.md`.
