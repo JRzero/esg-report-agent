@@ -1,6 +1,9 @@
-"""Lightweight HTTP performance smoke for a running service.
+"""Lightweight performance smoke.
 
 This is a regression guard, not a capacity benchmark.
+
+Set PERF_IN_PROCESS=true for deterministic CI against the ASGI app.
+Otherwise SERVICE_BASE_URL targets a running deployment.
 """
 import asyncio
 import os
@@ -19,21 +22,33 @@ async def one(client: httpx.AsyncClient, url: str, semaphore: asyncio.Semaphore)
 
 
 async def main() -> None:
-    base = os.getenv("SERVICE_BASE_URL", "http://localhost:8000").rstrip("/")
     requests = int(os.getenv("PERF_REQUESTS", "100"))
     concurrency = int(os.getenv("PERF_CONCURRENCY", "20"))
     max_p95_ms = float(os.getenv("PERF_MAX_P95_MS", "1000"))
+    in_process = os.getenv("PERF_IN_PROCESS", "").lower() == "true"
 
     semaphore = asyncio.Semaphore(concurrency)
-    async with httpx.AsyncClient(timeout=10) as client:
+    if in_process:
+        from app.main import app
+
+        transport = httpx.ASGITransport(app=app)
+        client = httpx.AsyncClient(transport=transport, base_url="http://test", timeout=10)
+        url = "/health"
+    else:
+        base = os.getenv("SERVICE_BASE_URL", "http://localhost:8000").rstrip("/")
+        client = httpx.AsyncClient(timeout=10)
+        url = f"{base}/health"
+
+    async with client:
         latencies = await asyncio.gather(
-            *(one(client, f"{base}/health", semaphore) for _ in range(requests))
+            *(one(client, url, semaphore) for _ in range(requests))
         )
 
     ordered = sorted(latencies)
     p50 = statistics.median(ordered)
     p95 = ordered[max(0, int(len(ordered) * 0.95) - 1)]
     result = {
+        "mode": "in-process" if in_process else "http",
         "requests": requests,
         "concurrency": concurrency,
         "p50_ms": round(p50, 2),
