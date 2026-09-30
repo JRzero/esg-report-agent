@@ -15,16 +15,13 @@ class ContextSearchResult:
 
 
 class OpenVikingAdapter:
-    """HTTP adapter for OpenViking context storage/retrieval.
-
-    Business code only sees normalized results. The adapter is optional at runtime:
-    evidence parsing and Fact workflows remain available when OpenViking is disabled.
-    """
+    """HTTP adapter for OpenViking context storage/retrieval."""
 
     def __init__(self):
         settings = get_settings()
         self.enabled = settings.openviking_enabled
         self.base = settings.openviking_base_url.rstrip("/")
+        self.upload_mode = settings.openviking_upload_mode
         self.headers = (
             {"X-API-Key": settings.openviking_api_key}
             if settings.openviking_api_key
@@ -35,12 +32,24 @@ class OpenVikingAdapter:
         if not self.enabled:
             raise RuntimeError("OpenViking integration is disabled")
 
+    async def ready(self) -> bool:
+        self._require_enabled()
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.get(f"{self.base}/ready")
+            response.raise_for_status()
+            payload = response.json()
+        if isinstance(payload, dict):
+            status = str(payload.get("status", "")).lower()
+            return status in {"ok", "ready"}
+        return False
+
     async def upload_temp(self, filename: str, data: bytes) -> str:
         self._require_enabled()
         async with httpx.AsyncClient(timeout=60) as client:
             response = await client.post(
                 f"{self.base}/api/v1/resources/temp_upload",
                 files={"file": (filename, data)},
+                data={"upload_mode": self.upload_mode},
                 headers=self.headers,
             )
             response.raise_for_status()
@@ -91,12 +100,16 @@ class OpenVikingAdapter:
         query: str,
         target_uri: str,
         limit: int = 10,
+        tags: list[str] | None = None,
     ) -> list[ContextSearchResult]:
         self._require_enabled()
+        body = {"query": query, "target_uri": target_uri, "limit": limit}
+        if tags:
+            body["tags"] = tags
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.post(
                 f"{self.base}/api/v1/search/find",
-                json={"query": query, "target_uri": target_uri, "limit": limit},
+                json=body,
                 headers={**self.headers, "Content-Type": "application/json"},
             )
             response.raise_for_status()
