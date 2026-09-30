@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.ai.llm import LLMGateway
 from app.ai.schemas import FactExtractionResult, SectionDraft, SectionPlan
 from app.core.errors import Conflict, NotFound
+from app.evals.quality import validate_fact_extraction, validate_section_draft
 from app.modules.models import (
     Citation,
     Claim,
@@ -58,10 +59,14 @@ class FactExtractionWorkflow:
         )
         out = await self.llm.generate_structured(self.SYSTEM, context, FactExtractionResult)
         valid_anchor_ids = {anchor.id for anchor in anchors}
+        grounding = validate_fact_extraction(out, valid_anchor_ids)
+        if not grounding.passed:
+            raise Conflict(
+                "AI_OUTPUT_UNGROUNDED",
+                "Fact extraction output referenced missing or unknown evidence anchors",
+            )
         created = []
         for candidate in out.facts:
-            if not candidate.anchor_ids or not set(candidate.anchor_ids).issubset(valid_anchor_ids):
-                continue
             data = FactCreate(**candidate.model_dump(exclude={"confidence"}), source_type="AI")
             created.append(
                 await FactService(self.s).create_candidate(
@@ -116,6 +121,13 @@ class SectionPlanningWorkflow:
             SectionPlan,
             "REASONING",
         )
+        allowed_fact_ids = {fact.id for fact in facts}
+        unknown_plan_facts = set(plan.fact_ids) - allowed_fact_ids
+        if unknown_plan_facts:
+            raise Conflict(
+                "AI_OUTPUT_UNGROUNDED",
+                "Writing plan referenced Facts outside the confirmed project Fact context",
+            )
         current = section.writing_plan or {}
         section.writing_plan = {
             "version": int(current.get("version", 0)) + 1,
@@ -167,6 +179,12 @@ class SectionWritingWorkflow:
             prompt,
             SectionDraft,
         )
+        grounding = validate_section_draft(draft, {fact.id for fact in facts})
+        if not grounding.passed:
+            raise Conflict(
+                "AI_OUTPUT_UNGROUNDED",
+                "Section draft contains factual claims without valid confirmed Fact references",
+            )
         max_order = (
             await self.s.scalar(
                 select(func.max(ReportBlock.sort_order)).where(
