@@ -17,7 +17,7 @@ from app.ai.schemas import (
 from app.ai.workflows import FactExtractionWorkflow, SectionWritingWorkflow
 from app.core.database import SessionLocal
 from app.evals.quality import numeric_faithfulness, validate_fact_extraction, validate_section_draft
-from app.modules.models import Fact, ReportSection, TenantMembership
+from app.modules.models import ReportBlock, ReportSection, TenantMembership
 from app.modules.schemas import FactCreate
 from app.modules.services import FactService
 from app.workers.tasks import _process_document
@@ -211,7 +211,7 @@ async def test_section_writing_workflow_fails_closed_on_uncited_factual_claim(cl
                 section_id,
             )
         assert getattr(exc.value, "code", None) == "AI_OUTPUT_UNGROUNDED"
-        blocks = await session.scalar(
-            select(Fact).where(Fact.project_id == UUID(project_id))
+        block = await session.scalar(
+            select(ReportBlock).where(ReportBlock.section_id == section_id)
         )
-        assert blocks is not None
+        assert block is None
