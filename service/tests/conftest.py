@@ -16,6 +16,7 @@ from app.modules.models import Tenant, TenantMembership, User
 @pytest_asyncio.fixture(autouse=True)
 async def clean_database(tmp_path: Path):
     settings = get_settings()
+    original_settings = settings.model_dump()
     settings.storage_backend = "local"
     settings.local_storage_path = str(tmp_path / "storage")
     settings.openviking_enabled = False
@@ -23,6 +24,8 @@ async def clean_database(tmp_path: Path):
         await connection.run_sync(Base.metadata.drop_all)
         await connection.run_sync(Base.metadata.create_all)
     yield
+    for key, value in original_settings.items():
+        setattr(settings, key, value)
     async with get_engine().begin() as connection:
         await connection.run_sync(Base.metadata.drop_all)
 
