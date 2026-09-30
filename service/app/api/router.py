@@ -401,17 +401,34 @@ async def transfer_owner(
     return obj
 
 
+async def _read_upload_limited(file: UploadFile) -> tuple[bytes, str]:
+    limit = get_settings().max_upload_bytes
+    payload = bytearray()
+    digest = sha256()
+    while True:
+        chunk = await file.read(1024 * 1024)
+        if not chunk:
+            break
+        payload.extend(chunk)
+        if len(payload) > limit:
+            raise DomainError(
+                "FILE_TOO_LARGE",
+                "Uploaded file exceeds configured size limit",
+                413,
+            )
+        digest.update(chunk)
+    if not payload:
+        raise DomainError("EMPTY_FILE", "Uploaded file is empty", 422)
+    return bytes(payload), digest.hexdigest()
+
+
 async def _create_document_version(
     db: AsyncSession,
     document: Document,
     file: UploadFile,
     user_id: UUID,
 ) -> DocumentVersion:
-    data = await file.read()
-    if not data:
-        raise DomainError("EMPTY_FILE", "Uploaded file is empty", 422)
-    if len(data) > get_settings().max_upload_bytes:
-        raise DomainError("FILE_TOO_LARGE", "Uploaded file exceeds configured size limit", 413)
+    data, digest = await _read_upload_limited(file)
     extension = Path(file.filename or "").suffix.lower()
     if extension not in {".pdf", ".docx", ".xlsx", ".xlsm", ".pptx", ".txt", ".md", ".csv"}:
         raise DomainError("UNSUPPORTED_FILE_TYPE", f"Unsupported file type: {extension}", 422)
@@ -434,7 +451,7 @@ async def _create_document_version(
             f"tenants/{document.tenant_id}/projects/{document.project_id}/documents/"
             f"{document.id}/versions/v{next_version}/original{extension}"
         ),
-        sha256=sha256(data).hexdigest(),
+        sha256=digest,
         uploaded_by=user_id,
     )
     db.add(version)

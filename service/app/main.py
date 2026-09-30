@@ -1,3 +1,4 @@
+from time import perf_counter
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
@@ -9,19 +10,57 @@ from app.api.router import router
 from app.core.config import get_settings
 from app.core.database import get_session_factory
 from app.core.errors import DomainError
+from app.core.logging import configure_logging, get_logger
 from app.integrations.storage import storage
 
 settings = get_settings()
-app = FastAPI(title=settings.app_name, version="0.1.0")
+configure_logging(settings.app_env)
+logger = get_logger()
+app = FastAPI(
+    title=settings.app_name,
+    version="0.1.0",
+    docs_url="/docs" if settings.docs_enabled else None,
+    redoc_url="/redoc" if settings.docs_enabled else None,
+    openapi_url="/openapi.json" if settings.docs_enabled else None,
+)
 app.include_router(router)
 
 
 @app.middleware("http")
-async def request_id_middleware(request: Request, call_next):
-    request_id = request.headers.get("X-Request-ID", str(uuid4()))
+async def security_and_request_id_middleware(request: Request, call_next):
+    supplied_request_id = request.headers.get("X-Request-ID", "")
+    request_id = supplied_request_id if 0 < len(supplied_request_id) <= 128 else str(uuid4())
     request.state.request_id = request_id
-    response = await call_next(request)
+
+    started = perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception:
+        logger.exception(
+            "http_request_failed",
+            request_id=request_id,
+            method=request.method,
+            path=request.url.path,
+            duration_ms=round((perf_counter() - started) * 1000, 2),
+        )
+        raise
+    logger.info(
+        "http_request",
+        request_id=request_id,
+        method=request.method,
+        path=request.url.path,
+        status_code=response.status_code,
+        duration_ms=round((perf_counter() - started) * 1000, 2),
+    )
     response.headers["X-Request-ID"] = request_id
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    if request.url.path.startswith("/api/v1/auth/"):
+        response.headers["Cache-Control"] = "no-store"
+    if settings.security_hsts_enabled:
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
 
 

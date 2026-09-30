@@ -43,7 +43,15 @@ services:
   worker:
     build: ../service
     env_file: ../service/.env
-    command: celery -A app.workers.celery_app:celery_app worker -l INFO
+    command: celery -A app.workers.celery_app:celery_app worker -l INFO -Q documents,ai,maintenance
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+
+  beat:
+    build: ../service
+    env_file: ../service/.env
+    command: celery -A app.workers.celery_app:celery_app beat -l INFO
     depends_on:
       postgres: {condition: service_healthy}
       redis: {condition: service_healthy}

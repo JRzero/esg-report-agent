@@ -49,10 +49,16 @@ async def test_openviking_ingest_and_find_contract(monkeypatch):
     settings.openviking_enabled = True
     settings.openviking_base_url = "http://viking.test"
     settings.openviking_api_key = "key"
+    settings.openviking_upload_mode = "shared"
 
     async def handler(request: httpx.Request):
+        if request.url.path == "/ready":
+            assert "X-API-Key" not in request.headers
+            return httpx.Response(200, json={"status": "ready"})
         assert request.headers["X-API-Key"] == "key"
         if request.url.path.endswith("/temp_upload"):
+            assert b'name="upload_mode"' in request.content
+            assert b"shared" in request.content
             return httpx.Response(200, json={"result": {"temp_file_id": "tmp-1"}})
         if request.url.path == "/api/v1/resources":
             body = json.loads(request.content)
@@ -87,6 +93,7 @@ async def test_openviking_ingest_and_find_contract(monkeypatch):
     )
 
     adapter = OpenVikingAdapter()
+    assert await adapter.ready() is True
     result = await adapter.add_bytes(
         "employees.xlsx",
         b"data",

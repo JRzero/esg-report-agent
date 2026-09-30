@@ -99,3 +99,8 @@ The live check is opt-in and is not a substitute for the deterministic acceptanc
 
 Frontend development is intentionally frozen during Service MVP acceptance. The future Next.js app
 will consume the stable `/api/v1` contract from the repository-root `web/` directory.
+
+
+## Production hardening
+
+Production-oriented concurrency, recovery, migration, security, container and performance acceptance is documented in `../docs/service-production-hardening-report.md`. Deployment and external-integration smoke runners live under `scripts/`.

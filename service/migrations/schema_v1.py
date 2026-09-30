@@ -1,12 +1,48 @@
+"""Frozen ORM metadata for migration revision 0001_initial.
+
+Do not import application models here. This module is an immutable schema snapshot
+used only to make the initial migration reproducible.
+"""
+
 from __future__ import annotations
 from datetime import date, datetime, timezone
 from decimal import Decimal
-from uuid import UUID
-from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from uuid import UUID, uuid4
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, MetaData, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column
-from app.core.database import Base
-from app.core.models import UUIDPKMixin, TimestampMixin, SoftDeleteMixin
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+NAMING_CONVENTION = {
+    "ix": "ix_%(column_0_label)s",
+    "uq": "uq_%(table_name)s_%(column_0_name)s",
+    "ck": "ck_%(table_name)s_%(constraint_name)s",
+    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+    "pk": "pk_%(table_name)s",
+}
+
+
+class Base(DeclarativeBase):
+    metadata = MetaData(naming_convention=NAMING_CONVENTION)
+
+
+class UUIDPKMixin:
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+
+
+class TimestampMixin:
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+
+class SoftDeleteMixin:
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
 
 JSON = JSONB().with_variant(__import__('sqlalchemy').JSON(), 'sqlite')
 
@@ -100,7 +136,6 @@ class DocumentVersion(UUIDPKMixin, Base):
     classification_status: Mapped[str]=mapped_column(String(30), default='PENDING')
     fact_extraction_status: Mapped[str]=mapped_column(String(30), default='PENDING')
     parse_error: Mapped[str|None]=mapped_column(Text, nullable=True)
-    processing_started_at: Mapped[datetime|None]=mapped_column(DateTime(timezone=True), nullable=True)
     uploaded_by: Mapped[UUID]=mapped_column(ForeignKey('app_user.id'))
     uploaded_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
@@ -411,7 +446,6 @@ class MissingItem(UUIDPKMixin, TimestampMixin, Base):
 
 class AITask(UUIDPKMixin, Base):
     __tablename__='ai_task'
-    __table_args__=(UniqueConstraint('tenant_id','created_by','idempotency_key', name='uq_ai_task_principal_idempotency'),)
     tenant_id: Mapped[UUID]=mapped_column(ForeignKey('tenant.id'), index=True)
     project_id: Mapped[UUID|None]=mapped_column(ForeignKey('project.id'), nullable=True, index=True)
     task_type: Mapped[str]=mapped_column(String(60), index=True)
@@ -425,7 +459,7 @@ class AITask(UUIDPKMixin, Base):
     error_code: Mapped[str|None]=mapped_column(String(120), nullable=True)
     error_message: Mapped[str|None]=mapped_column(Text, nullable=True)
     trace_id: Mapped[str|None]=mapped_column(String(120), nullable=True, index=True)
-    idempotency_key: Mapped[str|None]=mapped_column(String(500), nullable=True)
+    idempotency_key: Mapped[str|None]=mapped_column(String(500), nullable=True, unique=True)
     created_by: Mapped[UUID|None]=mapped_column(ForeignKey('app_user.id'), nullable=True)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     started_at: Mapped[datetime|None]=mapped_column(DateTime(timezone=True), nullable=True)

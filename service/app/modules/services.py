@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import Conflict, DomainError, NotFound
@@ -746,6 +747,16 @@ class TaskService:
     def __init__(self, session: AsyncSession):
         self.s = session
 
+    @staticmethod
+    def _same_submission(task: AITask, project_id, task_type, target_type, target_id, input_json) -> bool:
+        return (
+            task.project_id == project_id
+            and task.task_type == task_type
+            and task.target_type == target_type
+            and task.target_id == target_id
+            and (task.input_json or {}) == (input_json or {})
+        )
+
     async def create(
         self,
         tenant_id,
@@ -757,25 +768,49 @@ class TaskService:
         input_json=None,
         idempotency_key=None,
     ):
-        if idempotency_key:
-            existing = await self.s.scalar(
-                select(AITask).where(AITask.idempotency_key == idempotency_key)
-            )
-            if existing:
-                return existing
-        task = AITask(
-            tenant_id=tenant_id,
-            project_id=project_id,
-            created_by=user_id,
-            task_type=task_type,
-            target_type=target_type,
-            target_id=target_id,
-            input_json=input_json or {},
-            idempotency_key=idempotency_key,
+        values = {
+            "tenant_id": tenant_id,
+            "project_id": project_id,
+            "created_by": user_id,
+            "task_type": task_type,
+            "target_type": target_type,
+            "target_id": target_id,
+            "input_json": input_json or {},
+            "idempotency_key": idempotency_key,
+        }
+        if not idempotency_key:
+            task = AITask(**values)
+            self.s.add(task)
+            await self.s.flush()
+            return task
+
+        statement = (
+            pg_insert(AITask)
+            .values(**values)
+            .on_conflict_do_nothing(constraint="uq_ai_task_principal_idempotency")
+            .returning(AITask.id)
         )
-        self.s.add(task)
-        await self.s.flush()
-        return task
+        inserted_id = await self.s.scalar(statement)
+        if inserted_id:
+            return await self.s.get(AITask, inserted_id)
+
+        existing = await self.s.scalar(
+            select(AITask).where(
+                AITask.tenant_id == tenant_id,
+                AITask.created_by == user_id,
+                AITask.idempotency_key == idempotency_key,
+            )
+        )
+        if not existing:
+            raise Conflict("IDEMPOTENCY_CONFLICT", "Unable to resolve idempotent submission")
+        if not self._same_submission(
+            existing, project_id, task_type, target_type, target_id, input_json
+        ):
+            raise Conflict(
+                "IDEMPOTENCY_KEY_REUSED",
+                "Idempotency-Key was already used for a different request",
+            )
+        return existing
 
     async def list(self, tenant_id: UUID, project_id: UUID | None = None):
         query = select(AITask).where(AITask.tenant_id == tenant_id)
@@ -802,6 +837,26 @@ class TaskService:
         task.stage = "cancelled"
         task.completed_at = datetime.now(timezone.utc)
         return task
+
+    async def recover_stale(self, cutoff: datetime) -> int:
+        tasks = list(
+            (
+                await self.s.scalars(
+                    select(AITask).where(
+                        AITask.status == "RUNNING",
+                        AITask.started_at.is_not(None),
+                        AITask.started_at < cutoff,
+                    )
+                )
+            ).all()
+        )
+        for task in tasks:
+            task.status = "FAILED"
+            task.stage = "recovered_stale"
+            task.error_code = "TASK_STALE_RECOVERED"
+            task.error_message = "Worker execution exceeded stale-task threshold"
+            task.completed_at = datetime.now(timezone.utc)
+        return len(tasks)
 
 
 class StandardService:

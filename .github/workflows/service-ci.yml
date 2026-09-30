@@ -69,14 +69,32 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra dev
 
-      - name: Ruff
+      - name: Dependency consistency
+        run: uv pip check
+
+      - name: Ruff fatal checks
         run: uv run ruff check app tests migrations scripts --select E9,F63,F7,F82
 
       - name: Compile
         run: uv run python -m compileall -q app migrations scripts
 
-      - name: Database migration
+      - name: Database migration from empty
         run: uv run alembic upgrade head
+
+      - name: Migration upgrade from accepted v1
+        run: |
+          uv run alembic downgrade base
+          uv run alembic upgrade 0001_initial
+          uv run alembic upgrade head
 
       - name: Tests
         run: uv run pytest -q
+
+      - name: Performance smoke
+        run: PERF_IN_PROCESS=true PERF_REQUESTS=100 PERF_CONCURRENCY=20 PERF_MAX_P95_MS=1000 uv run python scripts/perf_smoke.py
+
+      - name: Build service container
+        run: docker build -t esg-report-agent-service:test .
+
+      - name: Verify non-root container
+        run: docker run --rm esg-report-agent-service:test python -c "import os; assert os.getuid() != 0"
