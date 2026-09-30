@@ -360,34 +360,53 @@ async def test_openviking_failure_does_not_destroy_parsed_evidence(client, monke
 
 
 @pytest.mark.asyncio
-async def test_openviking_reconciliation_marks_completed_import_ready(monkeypatch):
-    tenant_id, _, _ = await seed_tenant()
-    async with SessionLocal() as session:
-        version = DocumentVersion(
-            document_id=UUID("00000000-0000-0000-0000-000000000001"),
-            version_no=1,
-            original_filename="x.txt",
-            file_size=1,
-            object_key="x",
-            sha256="0" * 64,
-            uploaded_by=UUID("00000000-0000-0000-0000-000000000002"),
-        )
-        # Create this case through raw SQL would bypass FKs; instead this test only verifies
-        # normalization through adapter contracts. Full reconciliation is covered with real
-        # document rows in the failure/success worker tests above.
-        _ = version
+async def test_openviking_reconciliation_marks_completed_import_ready(client, monkeypatch):
     settings = get_settings()
+    settings.openviking_enabled = False
+    await seed_tenant()
+    headers = await login(client, "admin@example.com")
+    project_id = await _create_project(client, headers)
+
+    upload = await client.post(
+        f"/api/v1/projects/{project_id}/documents",
+        headers=headers,
+        data={"source_type": "EVIDENCE"},
+        files={"file": ("evidence.txt", b"hello", "text/plain")},
+    )
+    version_id = UUID(upload.json()["version_id"])
+    await tasks._process_document(str(version_id))
+
+    async with SessionLocal() as session:
+        binding = await session.scalar(
+            select(ContextBinding).where(ContextBinding.resource_id == version_id)
+        )
+        version = await session.get(DocumentVersion, version_id)
+        binding.processing_status = "PROCESSING"
+        binding.external_task_id = "task-1"
+        version.context_status = "PROCESSING"
+        await session.commit()
+
     settings.openviking_enabled = True
 
     class FakeAdapter:
         enabled = True
 
         async def get_task(self, task_id):
+            assert task_id == "task-1"
             return {"status": "completed", "result": {"context_count": 1}}
 
     monkeypatch.setattr(tasks, "OpenVikingAdapter", FakeAdapter)
     result = await tasks._reconcile_context_bindings()
-    assert result == {"checked": 0, "updated": 0}
+    assert result == {"checked": 1, "updated": 1}
+
+    async with SessionLocal() as session:
+        binding = await session.scalar(
+            select(ContextBinding).where(ContextBinding.resource_id == version_id)
+        )
+        version = await session.get(DocumentVersion, version_id)
+        assert binding.processing_status == "READY"
+        assert binding.metadata_json["external_result"]["context_count"] == 1
+        assert version.context_status == "READY"
 
 
 def test_parser_anchor_limit_is_enforced():
