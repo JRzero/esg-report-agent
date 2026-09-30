@@ -37,6 +37,28 @@ def parse_docx(data:bytes)->list[AnchorData]:
         out.append(AnchorData('DOCX_PARAGRAPH',text,heading_path=list(headings),paragraph_start=i))
     return out
 
+def parse_pptx(data:bytes)->list[AnchorData]:
+    from pptx import Presentation
+
+    prs = Presentation(BytesIO(data))
+    out = []
+    for slide_no, slide in enumerate(prs.slides, start=1):
+        for shape_no, shape in enumerate(slide.shapes):
+            text = getattr(shape, "text", "")
+            text = text.strip() if text else ""
+            if not text:
+                continue
+            out.append(
+                AnchorData(
+                    "PPTX_TEXT",
+                    text,
+                    slide_number=slide_no,
+                    metadata={"shape_index": shape_no, "shape_name": getattr(shape, "name", None)},
+                )
+            )
+    return out
+
+
 def parse_pdf(data:bytes)->list[AnchorData]:
     import fitz
     doc=fitz.open(stream=data,filetype='pdf'); out=[]
@@ -51,5 +73,6 @@ def parse_document(filename:str,data:bytes)->list[AnchorData]:
     if ext in ('.xlsx','.xlsm'): return parse_xlsx(data)
     if ext=='.docx': return parse_docx(data)
     if ext=='.pdf': return parse_pdf(data)
+    if ext=='.pptx': return parse_pptx(data)
     if ext in ('.txt','.md','.csv'): return [AnchorData('PLAIN_TEXT',data.decode('utf-8',errors='replace'))]
     raise ValueError(f'Unsupported file type: {ext}')
