@@ -412,7 +412,7 @@ async def _create_document_version(
     if len(data) > get_settings().max_upload_bytes:
         raise DomainError("FILE_TOO_LARGE", "Uploaded file exceeds configured size limit", 413)
     extension = Path(file.filename or "").suffix.lower()
-    if extension not in {".pdf", ".docx", ".xlsx", ".xlsm", ".txt", ".md", ".csv"}:
+    if extension not in {".pdf", ".docx", ".xlsx", ".xlsm", ".pptx", ".txt", ".md", ".csv"}:
         raise DomainError("UNSUPPORTED_FILE_TYPE", f"Unsupported file type: {extension}", 422)
     next_version = (
         await db.scalar(
