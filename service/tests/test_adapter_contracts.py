@@ -52,9 +52,10 @@ async def test_openviking_ingest_and_find_contract(monkeypatch):
     settings.openviking_upload_mode = "shared"
 
     async def handler(request: httpx.Request):
-        assert request.headers["X-API-Key"] == "key"
         if request.url.path == "/ready":
+            assert "X-API-Key" not in request.headers
             return httpx.Response(200, json={"status": "ready"})
+        assert request.headers["X-API-Key"] == "key"
         if request.url.path.endswith("/temp_upload"):
             assert b'name="upload_mode"' in request.content
             assert b"shared" in request.content
