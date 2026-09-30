@@ -81,9 +81,10 @@ jobs:
       - name: Database migration from empty
         run: uv run alembic upgrade head
 
-      - name: Migration round-trip from accepted v1
+      - name: Migration upgrade from accepted v1
         run: |
-          uv run alembic downgrade -2
+          uv run alembic downgrade base
+          uv run alembic upgrade 0001_initial
           uv run alembic upgrade head
 
       - name: Tests
