@@ -1,5 +1,5 @@
 from __future__ import annotations
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from uuid import UUID
 from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
@@ -46,7 +46,7 @@ class TenantMembership(UUIDPKMixin, Base):
     tenant_role: Mapped[str]=mapped_column(String(20), default='MEMBER')
     company_id: Mapped[UUID|None]=mapped_column(ForeignKey('company.id'), nullable=True)
     status: Mapped[str]=mapped_column(String(20), default='ACTIVE')
-    joined_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    joined_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 class Project(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
     __tablename__='project'
@@ -69,7 +69,7 @@ class ProjectMember(UUIDPKMixin, Base):
     membership_id: Mapped[UUID]=mapped_column(ForeignKey('tenant_membership.id'), index=True)
     project_role: Mapped[str]=mapped_column(String(30))
     status: Mapped[str]=mapped_column(String(20), default='ACTIVE')
-    joined_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    joined_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 class Document(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
     __tablename__='document'
@@ -101,7 +101,7 @@ class DocumentVersion(UUIDPKMixin, Base):
     fact_extraction_status: Mapped[str]=mapped_column(String(30), default='PENDING')
     parse_error: Mapped[str|None]=mapped_column(Text, nullable=True)
     uploaded_by: Mapped[UUID]=mapped_column(ForeignKey('app_user.id'))
-    uploaded_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    uploaded_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 class DocumentAnchor(UUIDPKMixin, Base):
     __tablename__='document_anchor'
@@ -193,7 +193,7 @@ class FactRevision(UUIDPKMixin, Base):
     snapshot: Mapped[dict]=mapped_column(JSON)
     change_type: Mapped[str]=mapped_column(String(40))
     changed_by: Mapped[UUID|None]=mapped_column(ForeignKey('app_user.id'), nullable=True)
-    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 class FactConflictGroup(UUIDPKMixin, TimestampMixin, Base):
     __tablename__='fact_conflict_group'
@@ -300,7 +300,7 @@ class ReportTemplateVersion(UUIDPKMixin, Base):
     source_type: Mapped[str]=mapped_column(String(30), default='MANUAL')
     source_document_id: Mapped[UUID|None]=mapped_column(ForeignKey('document.id'), nullable=True)
     created_by: Mapped[UUID|None]=mapped_column(ForeignKey('app_user.id'), nullable=True)
-    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 class ReportTemplateSection(UUIDPKMixin, Base):
     __tablename__='report_template_section'
@@ -369,7 +369,7 @@ class ReportBlockRevision(UUIDPKMixin, Base):
     change_reason: Mapped[str|None]=mapped_column(Text, nullable=True)
     created_by: Mapped[UUID|None]=mapped_column(ForeignKey('app_user.id'), nullable=True)
     ai_task_id: Mapped[UUID|None]=mapped_column(ForeignKey('ai_task.id', use_alter=True), nullable=True)
-    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 class Claim(UUIDPKMixin, Base):
     __tablename__='claim'
@@ -380,7 +380,7 @@ class Claim(UUIDPKMixin, Base):
     end_offset: Mapped[int|None]=mapped_column(Integer, nullable=True)
     verification_status: Mapped[str]=mapped_column(String(30), default='PENDING')
     risk_level: Mapped[str]=mapped_column(String(20), default='MEDIUM')
-    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 class Citation(UUIDPKMixin, Base):
     __tablename__='citation'
@@ -392,7 +392,7 @@ class Citation(UUIDPKMixin, Base):
     disclosure_requirement_id: Mapped[UUID|None]=mapped_column(ForeignKey('disclosure_requirement.id'), nullable=True)
     status: Mapped[str]=mapped_column(String(30), default='ACTIVE')
     created_by: Mapped[UUID|None]=mapped_column(ForeignKey('app_user.id'), nullable=True)
-    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 class MissingItem(UUIDPKMixin, TimestampMixin, Base):
     __tablename__='missing_item'
@@ -425,7 +425,7 @@ class AITask(UUIDPKMixin, Base):
     trace_id: Mapped[str|None]=mapped_column(String(120), nullable=True, index=True)
     idempotency_key: Mapped[str|None]=mapped_column(String(500), nullable=True, unique=True)
     created_by: Mapped[UUID|None]=mapped_column(ForeignKey('app_user.id'), nullable=True)
-    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     started_at: Mapped[datetime|None]=mapped_column(DateTime(timezone=True), nullable=True)
     completed_at: Mapped[datetime|None]=mapped_column(DateTime(timezone=True), nullable=True)
 
@@ -442,7 +442,7 @@ class AITrace(UUIDPKMixin, Base):
     estimated_cost: Mapped[Decimal|None]=mapped_column(Numeric(18,8), nullable=True)
     latency_ms: Mapped[int|None]=mapped_column(Integer, nullable=True)
     result_status: Mapped[str]=mapped_column(String(30), default='SUCCESS')
-    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 class AITraceContext(UUIDPKMixin, Base):
     __tablename__='ai_trace_context'
@@ -465,7 +465,7 @@ class ReportExport(UUIDPKMixin, Base):
     object_key: Mapped[str|None]=mapped_column(String(800), nullable=True)
     template_config: Mapped[dict]=mapped_column(JSON, default=dict)
     created_by: Mapped[UUID|None]=mapped_column(ForeignKey('app_user.id'), nullable=True)
-    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     completed_at: Mapped[datetime|None]=mapped_column(DateTime(timezone=True), nullable=True)
 
 class AuditLog(UUIDPKMixin, Base):
@@ -479,4 +479,4 @@ class AuditLog(UUIDPKMixin, Base):
     before_data: Mapped[dict|None]=mapped_column(JSON, nullable=True)
     after_data: Mapped[dict|None]=mapped_column(JSON, nullable=True)
     request_id: Mapped[str|None]=mapped_column(String(120), nullable=True)
-    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

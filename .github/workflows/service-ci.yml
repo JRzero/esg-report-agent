@@ -33,6 +33,15 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
 
     defaults:
       run:
@@ -40,8 +49,11 @@ jobs:
 
     env:
       DATABASE_URL: postgresql+asyncpg://esg:esg@localhost:5432/esg
+      REDIS_URL: redis://localhost:6379/0
+      STORAGE_BACKEND: local
+      OPENVIKING_ENABLED: "false"
       APP_ENV: test
-      JWT_SECRET: ci-test-secret
+      JWT_SECRET: ci-test-secret-0123456789-abcdef
 
     steps:
       - uses: actions/checkout@v4
