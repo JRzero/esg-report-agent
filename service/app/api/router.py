@@ -409,6 +409,8 @@ async def _create_document_version(
     data = await file.read()
     if not data:
         raise DomainError("EMPTY_FILE", "Uploaded file is empty", 422)
+    if len(data) > get_settings().max_upload_bytes:
+        raise DomainError("FILE_TOO_LARGE", "Uploaded file exceeds configured size limit", 413)
     extension = Path(file.filename or "").suffix.lower()
     if extension not in {".pdf", ".docx", ".xlsx", ".xlsm", ".txt", ".md", ".csv"}:
         raise DomainError("UNSUPPORTED_FILE_TYPE", f"Unsupported file type: {extension}", 422)
