@@ -1,0 +1,24 @@
+# Tasks
+
+- [ ] Tenant-scope AITask idempotency key
+- [ ] Add forward Alembic migration
+- [ ] Make idempotent task creation concurrency-safe
+- [ ] Atomically claim AI jobs
+- [ ] Atomically claim document parse jobs
+- [ ] Fix cancellation race
+- [ ] Add stale RUNNING task recovery
+- [ ] Add OpenViking tenant/project URI namespace
+- [ ] Add OpenViking async task reconciliation
+- [ ] Add OpenViking ready probe
+- [ ] Add bounded LLM retry/backoff
+- [ ] Stream upload with early size enforcement
+- [ ] Add parser resource limits
+- [ ] Validate production configuration
+- [ ] Add security response headers
+- [ ] Harden Docker runtime as non-root
+- [ ] Add concurrency acceptance tests
+- [ ] Add failure-injection tests
+- [ ] Add security acceptance tests
+- [ ] Add performance smoke
+- [ ] Extend deployment/live smoke
+- [ ] Publish production-hardening acceptance report
