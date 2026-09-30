@@ -4,6 +4,7 @@ from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,7 +32,7 @@ router = APIRouter(prefix="/api/v1", tags=["Lifecycle"])
 
 
 def _dump(obj):
-    return {c.name: getattr(obj, c.name) for c in obj.__table__.columns}
+    return jsonable_encoder({c.name: getattr(obj, c.name) for c in obj.__table__.columns})
 
 
 @router.patch("/companies/{company_id}")
