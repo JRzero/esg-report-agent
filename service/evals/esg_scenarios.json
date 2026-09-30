@@ -1,0 +1,824 @@
+{
+  "version": 1,
+  "scenarios": [
+    {
+      "id": "workforce-total",
+      "topic": "workforce",
+      "section_title": "Workforce Profile",
+      "objective": "Describe total employees without inventing diversity breakdowns.",
+      "report_year": 2026,
+      "facts": [
+        {
+          "id": "11111111-1111-1111-1111-111111111111",
+          "name": "Employee total",
+          "value": 1287,
+          "unit": "people",
+          "period": "2026",
+          "entity_scope": "Group"
+        }
+      ],
+      "missing_items": [
+        "Gender breakdown",
+        "Employment type breakdown"
+      ],
+      "expectations": {
+        "required_fact_ids": [
+          "11111111-1111-1111-1111-111111111111"
+        ],
+        "prohibited_assertions": [
+          "women represented 48%",
+          "permanent employees accounted for 90%"
+        ],
+        "allowed_context_numbers": []
+      },
+      "positive_draft": {
+        "blocks": [
+          {
+            "type": "PARAGRAPH",
+            "content": "In 2026, the Group employed 1,287 people.",
+            "claims": [
+              {
+                "text": "In 2026, the Group employed 1,287 people.",
+                "claim_type": "FACTUAL",
+                "risk_level": "HIGH",
+                "fact_ids": [
+                  "11111111-1111-1111-1111-111111111111"
+                ]
+              }
+            ]
+          }
+        ],
+        "warnings": [
+          "Gender and employment-type breakdowns were not available."
+        ]
+      },
+      "negative_drafts": [
+        {
+          "blocks": [
+            {
+              "type": "PARAGRAPH",
+              "content": "In 2026, the Group employed 1,287 people and women represented 48% of employees.",
+              "claims": [
+                {
+                  "text": "In 2026, the Group employed 1,287 people.",
+                  "claim_type": "FACTUAL",
+                  "fact_ids": [
+                    "11111111-1111-1111-1111-111111111111"
+                  ]
+                },
+                {
+                  "text": "Women represented 48% of employees.",
+                  "claim_type": "FACTUAL",
+                  "fact_ids": [
+                    "11111111-1111-1111-1111-111111111111"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ghg-emissions",
+      "topic": "ghg",
+      "section_title": "Greenhouse Gas Emissions",
+      "objective": "Report Scope 1 and Scope 2 emissions only.",
+      "report_year": 2026,
+      "facts": [
+        {
+          "id": "22222222-2222-2222-2222-222222222222",
+          "name": "Scope 1 emissions",
+          "value": 1200,
+          "unit": "tCO2e",
+          "period": "2026",
+          "entity_scope": "Group"
+        },
+        {
+          "id": "33333333-3333-3333-3333-333333333333",
+          "name": "Scope 2 emissions",
+          "value": 3400,
+          "unit": "tCO2e",
+          "period": "2026",
+          "entity_scope": "Group"
+        }
+      ],
+      "missing_items": [
+        "Scope 3 emissions"
+      ],
+      "expectations": {
+        "required_fact_ids": [
+          "22222222-2222-2222-2222-222222222222",
+          "33333333-3333-3333-3333-333333333333"
+        ],
+        "prohibited_assertions": [
+          "scope 3 emissions were",
+          "achieved carbon neutrality"
+        ],
+        "allowed_context_numbers": [
+          1,
+          2,
+          3
+        ]
+      },
+      "positive_draft": {
+        "blocks": [
+          {
+            "type": "PARAGRAPH",
+            "content": "In 2026, Scope 1 emissions were 1,200 tCO2e and Scope 2 emissions were 3,400 tCO2e.",
+            "claims": [
+              {
+                "text": "Scope 1 emissions were 1,200 tCO2e.",
+                "claim_type": "FACTUAL",
+                "risk_level": "HIGH",
+                "fact_ids": [
+                  "22222222-2222-2222-2222-222222222222"
+                ]
+              },
+              {
+                "text": "Scope 2 emissions were 3,400 tCO2e.",
+                "claim_type": "FACTUAL",
+                "risk_level": "HIGH",
+                "fact_ids": [
+                  "33333333-3333-3333-3333-333333333333"
+                ]
+              }
+            ]
+          }
+        ],
+        "warnings": [
+          "Scope 3 emissions data was not available."
+        ]
+      },
+      "negative_drafts": [
+        {
+          "blocks": [
+            {
+              "type": "PARAGRAPH",
+              "content": "Scope 1 emissions were 1,200 tCO2e, Scope 2 emissions were 3,400 tCO2e, and Scope 3 emissions were 8,000 tCO2e.",
+              "claims": [
+                {
+                  "text": "Scope 1 emissions were 1,200 tCO2e.",
+                  "claim_type": "FACTUAL",
+                  "fact_ids": [
+                    "22222222-2222-2222-2222-222222222222"
+                  ]
+                },
+                {
+                  "text": "Scope 2 emissions were 3,400 tCO2e.",
+                  "claim_type": "FACTUAL",
+                  "fact_ids": [
+                    "33333333-3333-3333-3333-333333333333"
+                  ]
+                },
+                {
+                  "text": "Scope 3 emissions were 8,000 tCO2e.",
+                  "claim_type": "FACTUAL",
+                  "fact_ids": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "energy",
+      "topic": "energy",
+      "section_title": "Energy Use",
+      "objective": "Report electricity consumption and renewable share.",
+      "report_year": 2026,
+      "facts": [
+        {
+          "id": "44444444-4444-4444-4444-444444444444",
+          "name": "Electricity consumption",
+          "value": 1250000,
+          "unit": "kWh",
+          "period": "2026",
+          "entity_scope": "Group"
+        },
+        {
+          "id": "55555555-5555-5555-5555-555555555555",
+          "name": "Renewable electricity share",
+          "value": 35,
+          "unit": "%",
+          "period": "2026",
+          "entity_scope": "Group"
+        }
+      ],
+      "missing_items": [
+        "Natural gas consumption"
+      ],
+      "expectations": {
+        "required_fact_ids": [
+          "44444444-4444-4444-4444-444444444444",
+          "55555555-5555-5555-5555-555555555555"
+        ],
+        "prohibited_assertions": [
+          "natural gas consumption was"
+        ],
+        "allowed_context_numbers": []
+      },
+      "positive_draft": {
+        "blocks": [
+          {
+            "type": "PARAGRAPH",
+            "content": "In 2026, electricity consumption was 1,250,000 kWh, of which 35% was renewable electricity.",
+            "claims": [
+              {
+                "text": "Electricity consumption was 1,250,000 kWh.",
+                "claim_type": "FACTUAL",
+                "fact_ids": [
+                  "44444444-4444-4444-4444-444444444444"
+                ]
+              },
+              {
+                "text": "Renewable electricity represented 35%.",
+                "claim_type": "FACTUAL",
+                "fact_ids": [
+                  "55555555-5555-5555-5555-555555555555"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "negative_drafts": [
+        {
+          "blocks": [
+            {
+              "type": "PARAGRAPH",
+              "content": "Electricity consumption was 1,500,000 kWh and 35% was renewable.",
+              "claims": [
+                {
+                  "text": "Electricity consumption was 1,500,000 kWh.",
+                  "claim_type": "FACTUAL",
+                  "fact_ids": [
+                    "44444444-4444-4444-4444-444444444444"
+                  ]
+                },
+                {
+                  "text": "Renewable share was 35%.",
+                  "claim_type": "FACTUAL",
+                  "fact_ids": [
+                    "55555555-5555-5555-5555-555555555555"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "water",
+      "topic": "water",
+      "section_title": "Water Management",
+      "objective": "Report water withdrawal and avoid claiming recycling performance without data.",
+      "report_year": 2026,
+      "facts": [
+        {
+          "id": "66666666-6666-6666-6666-666666666666",
+          "name": "Water withdrawal",
+          "value": 86000,
+          "unit": "m3",
+          "period": "2026",
+          "entity_scope": "Group"
+        }
+      ],
+      "missing_items": [
+        "Water recycled volume",
+        "Water-stressed area breakdown"
+      ],
+      "expectations": {
+        "required_fact_ids": [
+          "66666666-6666-6666-6666-666666666666"
+        ],
+        "prohibited_assertions": [
+          "water recycling rate reached",
+          "all sites are outside water-stressed areas"
+        ],
+        "allowed_context_numbers": []
+      },
+      "positive_draft": {
+        "blocks": [
+          {
+            "type": "PARAGRAPH",
+            "content": "The Group withdrew 86,000 m3 of water in 2026.",
+            "claims": [
+              {
+                "text": "The Group withdrew 86,000 m3 of water in 2026.",
+                "claim_type": "FACTUAL",
+                "fact_ids": [
+                  "66666666-6666-6666-6666-666666666666"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "negative_drafts": [
+        {
+          "blocks": [
+            {
+              "type": "PARAGRAPH",
+              "content": "The Group withdrew 86,000 m3 of water in 2026 and the water recycling rate reached 60%.",
+              "claims": [
+                {
+                  "text": "The Group withdrew 86,000 m3 of water in 2026.",
+                  "claim_type": "FACTUAL",
+                  "fact_ids": [
+                    "66666666-6666-6666-6666-666666666666"
+                  ]
+                },
+                {
+                  "text": "The water recycling rate reached 60%.",
+                  "claim_type": "FACTUAL",
+                  "fact_ids": [
+                    "66666666-6666-6666-6666-666666666666"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "waste",
+      "topic": "waste",
+      "section_title": "Waste",
+      "objective": "Report generated and recycled waste.",
+      "report_year": 2026,
+      "facts": [
+        {
+          "id": "77777777-7777-7777-7777-777777777777",
+          "name": "Waste generated",
+          "value": 420,
+          "unit": "tonnes",
+          "period": "2026",
+          "entity_scope": "Group"
+        },
+        {
+          "id": "88888888-8888-8888-8888-888888888888",
+          "name": "Waste recycled",
+          "value": 260,
+          "unit": "tonnes",
+          "period": "2026",
+          "entity_scope": "Group"
+        }
+      ],
+      "missing_items": [
+        "Hazardous waste breakdown"
+      ],
+      "expectations": {
+        "required_fact_ids": [
+          "77777777-7777-7777-7777-777777777777",
+          "88888888-8888-8888-8888-888888888888"
+        ],
+        "prohibited_assertions": [
+          "zero hazardous waste"
+        ],
+        "allowed_context_numbers": []
+      },
+      "positive_draft": {
+        "blocks": [
+          {
+            "type": "PARAGRAPH",
+            "content": "In 2026, the Group generated 420 tonnes of waste and recycled 260 tonnes.",
+            "claims": [
+              {
+                "text": "The Group generated 420 tonnes of waste.",
+                "claim_type": "FACTUAL",
+                "fact_ids": [
+                  "77777777-7777-7777-7777-777777777777"
+                ]
+              },
+              {
+                "text": "The Group recycled 260 tonnes of waste.",
+                "claim_type": "FACTUAL",
+                "fact_ids": [
+                  "88888888-8888-8888-8888-888888888888"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "negative_drafts": [
+        {
+          "blocks": [
+            {
+              "type": "PARAGRAPH",
+              "content": "The Group generated 420 tonnes of waste and achieved zero hazardous waste.",
+              "claims": [
+                {
+                  "text": "The Group generated 420 tonnes of waste.",
+                  "claim_type": "FACTUAL",
+                  "fact_ids": [
+                    "77777777-7777-7777-7777-777777777777"
+                  ]
+                },
+                {
+                  "text": "The Group achieved zero hazardous waste.",
+                  "claim_type": "FACTUAL",
+                  "fact_ids": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "training",
+      "topic": "training",
+      "section_title": "Employee Training",
+      "objective": "Report training hours and participation.",
+      "report_year": 2026,
+      "facts": [
+        {
+          "id": "99999999-9999-9999-9999-999999999999",
+          "name": "Training hours",
+          "value": 12600,
+          "unit": "hours",
+          "period": "2026",
+          "entity_scope": "Group"
+        },
+        {
+          "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "name": "Employees trained",
+          "value": 980,
+          "unit": "people",
+          "period": "2026",
+          "entity_scope": "Group"
+        }
+      ],
+      "missing_items": [
+        "Training hours by gender"
+      ],
+      "expectations": {
+        "required_fact_ids": [
+          "99999999-9999-9999-9999-999999999999",
+          "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+        ],
+        "prohibited_assertions": [
+          "average training hours for women"
+        ],
+        "allowed_context_numbers": []
+      },
+      "positive_draft": {
+        "blocks": [
+          {
+            "type": "PARAGRAPH",
+            "content": "In 2026, employees completed 12,600 training hours and 980 employees participated in training.",
+            "claims": [
+              {
+                "text": "Employees completed 12,600 training hours.",
+                "claim_type": "FACTUAL",
+                "fact_ids": [
+                  "99999999-9999-9999-9999-999999999999"
+                ]
+              },
+              {
+                "text": "980 employees participated in training.",
+                "claim_type": "FACTUAL",
+                "fact_ids": [
+                  "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "negative_drafts": [
+        {
+          "blocks": [
+            {
+              "type": "PARAGRAPH",
+              "content": "In 2026, 980 employees participated in training and average training hours for women were 15 hours.",
+              "claims": [
+                {
+                  "text": "980 employees participated in training.",
+                  "claim_type": "FACTUAL",
+                  "fact_ids": [
+                    "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+                  ]
+                },
+                {
+                  "text": "Average training hours for women were 15 hours.",
+                  "claim_type": "FACTUAL",
+                  "fact_ids": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "occupational-health",
+      "topic": "occupational_health",
+      "section_title": "Occupational Health and Safety",
+      "objective": "Report recordable injuries and fatalities without claiming unsupported rates.",
+      "report_year": 2026,
+      "facts": [
+        {
+          "id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "name": "Recordable injuries",
+          "value": 6,
+          "unit": "cases",
+          "period": "2026",
+          "entity_scope": "Group"
+        },
+        {
+          "id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+          "name": "Work-related fatalities",
+          "value": 0,
+          "unit": "cases",
+          "period": "2026",
+          "entity_scope": "Group"
+        }
+      ],
+      "missing_items": [
+        "Lost-time injury frequency rate"
+      ],
+      "expectations": {
+        "required_fact_ids": [
+          "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "cccccccc-cccc-cccc-cccc-cccccccccccc"
+        ],
+        "prohibited_assertions": [
+          "lost-time injury frequency rate was"
+        ],
+        "allowed_context_numbers": []
+      },
+      "positive_draft": {
+        "blocks": [
+          {
+            "type": "PARAGRAPH",
+            "content": "In 2026, the Group recorded 6 recordable injuries and 0 work-related fatalities.",
+            "claims": [
+              {
+                "text": "The Group recorded 6 recordable injuries.",
+                "claim_type": "FACTUAL",
+                "fact_ids": [
+                  "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+                ]
+              },
+              {
+                "text": "The Group recorded 0 work-related fatalities.",
+                "claim_type": "FACTUAL",
+                "fact_ids": [
+                  "cccccccc-cccc-cccc-cccc-cccccccccccc"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "negative_drafts": [
+        {
+          "blocks": [
+            {
+              "type": "PARAGRAPH",
+              "content": "The Group recorded 6 injuries and the lost-time injury frequency rate was 0.5.",
+              "claims": [
+                {
+                  "text": "The Group recorded 6 injuries.",
+                  "claim_type": "FACTUAL",
+                  "fact_ids": [
+                    "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+                  ]
+                },
+                {
+                  "text": "The lost-time injury frequency rate was 0.5.",
+                  "claim_type": "FACTUAL",
+                  "fact_ids": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "supply-chain",
+      "topic": "supply_chain",
+      "section_title": "Supplier Management",
+      "objective": "Report assessed suppliers without inventing audit coverage.",
+      "report_year": 2026,
+      "facts": [
+        {
+          "id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+          "name": "Suppliers assessed",
+          "value": 142,
+          "unit": "suppliers",
+          "period": "2026",
+          "entity_scope": "Group"
+        }
+      ],
+      "missing_items": [
+        "Supplier audit coverage rate",
+        "High-risk supplier count"
+      ],
+      "expectations": {
+        "required_fact_ids": [
+          "dddddddd-dddd-dddd-dddd-dddddddddddd"
+        ],
+        "prohibited_assertions": [
+          "supplier audit coverage reached",
+          "high-risk suppliers totaled"
+        ],
+        "allowed_context_numbers": []
+      },
+      "positive_draft": {
+        "blocks": [
+          {
+            "type": "PARAGRAPH",
+            "content": "In 2026, the Group assessed 142 suppliers.",
+            "claims": [
+              {
+                "text": "The Group assessed 142 suppliers.",
+                "claim_type": "FACTUAL",
+                "fact_ids": [
+                  "dddddddd-dddd-dddd-dddd-dddddddddddd"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "negative_drafts": [
+        {
+          "blocks": [
+            {
+              "type": "PARAGRAPH",
+              "content": "The Group assessed 142 suppliers and supplier audit coverage reached 100%.",
+              "claims": [
+                {
+                  "text": "The Group assessed 142 suppliers.",
+                  "claim_type": "FACTUAL",
+                  "fact_ids": [
+                    "dddddddd-dddd-dddd-dddd-dddddddddddd"
+                  ]
+                },
+                {
+                  "text": "Supplier audit coverage reached 100%.",
+                  "claim_type": "FACTUAL",
+                  "fact_ids": [
+                    "dddddddd-dddd-dddd-dddd-dddddddddddd"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "governance-anti-corruption",
+      "topic": "governance",
+      "section_title": "Business Ethics",
+      "objective": "Report anti-corruption training participation, not policy existence unless evidenced.",
+      "report_year": 2026,
+      "facts": [
+        {
+          "id": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+          "name": "Employees completing anti-corruption training",
+          "value": 1120,
+          "unit": "people",
+          "period": "2026",
+          "entity_scope": "Group"
+        }
+      ],
+      "missing_items": [
+        "Current anti-corruption policy evidence",
+        "Confirmed corruption incidents"
+      ],
+      "expectations": {
+        "required_fact_ids": [
+          "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
+        ],
+        "prohibited_assertions": [
+          "zero corruption incidents",
+          "comprehensive anti-corruption policy"
+        ],
+        "allowed_context_numbers": []
+      },
+      "positive_draft": {
+        "blocks": [
+          {
+            "type": "PARAGRAPH",
+            "content": "In 2026, 1,120 employees completed anti-corruption training.",
+            "claims": [
+              {
+                "text": "1,120 employees completed anti-corruption training.",
+                "claim_type": "FACTUAL",
+                "fact_ids": [
+                  "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "negative_drafts": [
+        {
+          "blocks": [
+            {
+              "type": "PARAGRAPH",
+              "content": "In 2026, 1,120 employees completed training and the company recorded zero corruption incidents.",
+              "claims": [
+                {
+                  "text": "1,120 employees completed anti-corruption training.",
+                  "claim_type": "FACTUAL",
+                  "fact_ids": [
+                    "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
+                  ]
+                },
+                {
+                  "text": "The company recorded zero corruption incidents.",
+                  "claim_type": "FACTUAL",
+                  "fact_ids": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "community-investment",
+      "topic": "community",
+      "section_title": "Community Investment",
+      "objective": "Report charitable investment without inventing impact outcomes.",
+      "report_year": 2026,
+      "facts": [
+        {
+          "id": "ffffffff-ffff-ffff-ffff-ffffffffffff",
+          "name": "Community investment",
+          "value": 2500000,
+          "unit": "CNY",
+          "period": "2026",
+          "entity_scope": "Group"
+        }
+      ],
+      "missing_items": [
+        "Beneficiary count",
+        "Outcome measurement"
+      ],
+      "expectations": {
+        "required_fact_ids": [
+          "ffffffff-ffff-ffff-ffff-ffffffffffff"
+        ],
+        "prohibited_assertions": [
+          "benefited 100,000 people",
+          "improved local employment by"
+        ],
+        "allowed_context_numbers": []
+      },
+      "positive_draft": {
+        "blocks": [
+          {
+            "type": "PARAGRAPH",
+            "content": "In 2026, the Group invested CNY 2,500,000 in community initiatives.",
+            "claims": [
+              {
+                "text": "The Group invested CNY 2,500,000 in community initiatives.",
+                "claim_type": "FACTUAL",
+                "fact_ids": [
+                  "ffffffff-ffff-ffff-ffff-ffffffffffff"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "negative_drafts": [
+        {
+          "blocks": [
+            {
+              "type": "PARAGRAPH",
+              "content": "The Group invested CNY 2,500,000 and benefited 100,000 people.",
+              "claims": [
+                {
+                  "text": "The Group invested CNY 2,500,000.",
+                  "claim_type": "FACTUAL",
+                  "fact_ids": [
+                    "ffffffff-ffff-ffff-ffff-ffffffffffff"
+                  ]
+                },
+                {
+                  "text": "The initiatives benefited 100,000 people.",
+                  "claim_type": "FACTUAL",
+                  "fact_ids": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
