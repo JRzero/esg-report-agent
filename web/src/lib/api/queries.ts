@@ -12,7 +12,7 @@ import {queryKeys} from '@/lib/query/query-keys';
 
 export function useSessionIdentity() {
   return useQuery({
-    queryKey: ['session', 'me'],
+    queryKey: queryKeys.session,
     queryFn: () => browserRequest<SessionIdentity>('/api/session/me'),
     staleTime: 60_000,
     retry: false,
@@ -21,7 +21,7 @@ export function useSessionIdentity() {
 
 export function useCompanies() {
   return useQuery({
-    queryKey: ['companies'],
+    queryKey: queryKeys.companies,
     queryFn: () => browserRequest<Company[]>('/api/companies'),
   });
 }
