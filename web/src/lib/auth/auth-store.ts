@@ -1,25 +1,16 @@
 'use client';
 
 import {create} from 'zustand';
+import type {SessionIdentity} from '@/lib/api/types';
 
 type AuthState = {
-  accessToken: string | null;
-  tenantId: string | null;
-  membershipId: string | null;
-  setSession: (session: {
-    accessToken: string;
-    tenantId?: string | null;
-    membershipId?: string | null;
-  }) => void;
-  clearSession: () => void;
+  identity: SessionIdentity | null;
+  setIdentity: (identity: SessionIdentity) => void;
+  clearIdentity: () => void;
 };
 
 export const useAuthStore = create<AuthState>((set) => ({
-  accessToken: null,
-  tenantId: null,
-  membershipId: null,
-  setSession: ({accessToken, tenantId = null, membershipId = null}) =>
-    set({accessToken, tenantId, membershipId}),
-  clearSession: () =>
-    set({accessToken: null, tenantId: null, membershipId: null}),
+  identity: null,
+  setIdentity: (identity) => set({identity}),
+  clearIdentity: () => set({identity: null}),
 }));
