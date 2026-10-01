@@ -1,0 +1,22 @@
+# Tasks
+
+- [ ] Scaffold Next.js 16 frontend
+- [ ] Pin Astryx 0.6.3 packages
+- [ ] Configure Astryx + Tailwind CSS layer order
+- [ ] Configure Theme/Link/Query providers
+- [ ] Add ProductShell with Astryx AppShell + SideNav
+- [ ] Add API client foundation
+- [ ] Add auth/workspace local state foundation
+- [ ] Add EvidenceCard
+- [ ] Add FactCard
+- [ ] Add GRICoverage
+- [ ] Add MissingItemCard
+- [ ] Add CitationMarker
+- [ ] Add AIAction
+- [ ] Add foundation showcase page
+- [ ] Add web AGENTS.md
+- [ ] Add component/evidence-boundary tests
+- [ ] Add Web CI
+- [ ] Verify Astryx CLI
+- [ ] Verify production build
+- [ ] Publish acceptance report
