@@ -33,7 +33,7 @@ export function ProductShell({children}: {children: ReactNode}) {
               <div className="mt-1 text-xs opacity-60">Evidence-first workspace</div>
             </div>
           }>
-          <SideNavSection label="工作台">
+          <SideNavSection title="工作台">
             {navigation.map((item) => (
               <SideNavItem
                 key={item.href}
