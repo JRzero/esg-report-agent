@@ -34,9 +34,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Astryx component contract
         run: npm run astryx -- component Button --json > /tmp/astryx-button.json
@@ -52,3 +54,18 @@ jobs:
 
       - name: Production build
         run: npm run build
+
+      - name: SSR smoke
+        run: |
+          npm run start -- --hostname 127.0.0.1 --port 3000 > /tmp/esg-web.log 2>&1 &
+          PID=$!
+          trap 'kill $PID || true' EXIT
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:3000/ > /tmp/esg-home.html; then
+              grep -q "Frontend Foundation" /tmp/esg-home.html
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/esg-web.log
+          exit 1
