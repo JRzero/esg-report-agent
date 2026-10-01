@@ -54,3 +54,23 @@ Development is governed by:
 - `specs/002-evidence-fact`
 - `specs/003-gri-intelligence`
 - `specs/004-report-agent`
+
+
+## Authentication & Project Workspace
+
+The first real frontend vertical slice is implemented:
+
+```text
+/login
+  ↓
+Next.js HttpOnly BFF session
+  ↓
+/projects
+  ↓
+/projects/new
+  ↓
+/projects/{projectId}
+```
+
+Project-scoped navigation is now stable for Materials, Facts, Reports, GRI, Missing Data and Members.
+Those later modules remain explicit placeholders until their own specs are implemented.
