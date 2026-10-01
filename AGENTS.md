@@ -18,3 +18,10 @@ Never treat model output or retrieval output as business truth. PostgreSQL-confi
 - Agent workflows write through Domain Services, never directly through SQLAlchemy sessions.
 - Original DocumentVersion and DocumentAnchor rows are immutable.
 - Long-running external calls never hold a DB transaction open.
+
+
+## Frontend
+- Frontend implementation lives under `web/`.
+- Before editing frontend code, read `web/AGENTS.md`.
+- Astryx is the primary frontend design system; do not add a competing primitive UI kit.
+- ESG frontend components must preserve the same Evidence / Reference / Fact provenance boundaries enforced by the Service.
