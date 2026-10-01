@@ -6,6 +6,7 @@ on:
     paths:
       - "web/**"
       - "specs/009-frontend-foundation-astryx/**"
+      - "specs/010-authentication-project-workspace/**"
       - ".github/workflows/web-ci.yml"
   pull_request:
     paths:
@@ -25,6 +26,7 @@ jobs:
 
     env:
       NEXT_TELEMETRY_DISABLED: "1"
+      SERVICE_BASE_URL: http://localhost:8000
       NEXT_PUBLIC_SERVICE_BASE_URL: http://localhost:8000
 
     steps:
@@ -61,8 +63,8 @@ jobs:
           PID=$!
           trap 'kill $PID || true' EXIT
           for i in {1..30}; do
-            if curl -fsS http://127.0.0.1:3000/ > /tmp/esg-home.html; then
-              grep -q "Frontend Foundation" /tmp/esg-home.html
+            if curl -fsSL http://127.0.0.1:3000/ > /tmp/esg-home.html; then
+              grep -q "登录工作台" /tmp/esg-home.html
               exit 0
             fi
             sleep 1
