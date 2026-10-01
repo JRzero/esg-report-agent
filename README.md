@@ -5,7 +5,7 @@ Enterprise ESG report production platform built around evidence, confirmed facts
 ## Repository layout
 
 - `service/` — FastAPI service, Celery workers, migrations, parsers, AI runtime, tests
-- `web/` — reserved for the later Next.js application
+- `web/` — Next.js + Astryx frontend and ESG domain design system
 - `specs/` — spec-driven product/engineering requirements and implementation tasks
 - `docs/` — API contract and generated OpenAPI material
 - `deploy/` — local/production deployment assets
@@ -13,9 +13,15 @@ Enterprise ESG report production platform built around evidence, confirmed facts
 
 ## Current focus
 
-Frontend development is intentionally deferred. The current delivery target is the service MVP:
+The backend Service MVP, production hardening and ESG Agent evaluation gates are accepted. Frontend work now begins at the foundation/design-system layer only.
+
+Current product chain:
 
 `Document → Evidence Anchor → Fact → Disclosure → Report → Claim → Citation → Verification → DOCX`
+
+Current frontend foundation:
+
+`Next.js → Astryx → ESG Domain Components → Service API`
 
 ## Run the service locally
 
