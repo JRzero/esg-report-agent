@@ -1,0 +1,36 @@
+name: Bootstrap Web Lockfile
+
+on:
+  push:
+    branches: [frontend-foundation-astryx]
+    paths:
+      - ".github/workflows/web-lock-bootstrap.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  lockfile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Generate lockfile
+        working-directory: web
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Commit lockfile and remove bootstrap
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f .github/workflows/web-lock-bootstrap.yml
+          git add web/package-lock.json .github/workflows/web-lock-bootstrap.yml
+          git commit -m "build: lock frontend dependencies"
+          git push
