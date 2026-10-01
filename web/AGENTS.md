@@ -38,3 +38,11 @@
 
 ## Report editor
 Do not add a general rich-text editor in Spec 009. The Report Workspace gets a dedicated spec and will use the backend ReportBlock model as its source of structure.
+
+
+## Authentication/BFF
+- Browser code must not persist FastAPI access or refresh tokens in localStorage, sessionStorage, Zustand, or IndexedDB.
+- Authentication tokens belong to HttpOnly cookies managed by Next.js Route Handlers.
+- Client components call same-origin BFF routes under `/api/*`.
+- Service API authentication/refresh logic belongs under `src/lib/server`, not feature components.
+- A client-side identity store may cache non-secret user/tenant display data only.
