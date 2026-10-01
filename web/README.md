@@ -71,3 +71,42 @@ NEXT_PUBLIC_SERVICE_BASE_URL=http://localhost:8000
 ```
 
 The current foundation exposes an API client abstraction but does not yet implement the product login route or feature pages.
+
+
+## Authentication & Project Workspace
+
+The browser does not persist FastAPI access or refresh tokens.
+
+```text
+Browser
+  ↓ same-origin /api/*
+Next.js BFF
+  ↓ Authorization: Bearer ...
+FastAPI Service
+```
+
+The BFF stores access/refresh tokens in HttpOnly, SameSite=Lax cookies and refreshes the access token through the Service when needed.
+
+Current implemented routes:
+
+```text
+/login
+/projects
+/projects/new
+/projects/[projectId]
+/projects/[projectId]/materials
+/projects/[projectId]/facts
+/projects/[projectId]/reports
+/projects/[projectId]/gri
+/projects/[projectId]/missing
+/projects/[projectId]/members
+```
+
+Only the project Overview is functional in Spec 010. Other project routes are explicit placeholders for later feature specs.
+
+Local seed login:
+
+```text
+admin@example.com
+admin123
+```
