@@ -46,3 +46,12 @@ Do not add a general rich-text editor in Spec 009. The Report Workspace gets a d
 - Client components call same-origin BFF routes under `/api/*`.
 - Service API authentication/refresh logic belongs under `src/lib/server`, not feature components.
 - A client-side identity store may cache non-secret user/tenant display data only.
+
+
+## Evidence Viewer
+- Original file binaries live in Service object storage; the browser is not a second source-of-truth parser.
+- Treat Service `DocumentAnchor` coordinates as authoritative for Fact/Citation provenance.
+- REFERENCE and STANDARD source types must never expose Fact Extraction actions.
+- HISTORICAL material may produce candidates only with period awareness and human confirmation.
+- Do not transform a Reference card into an Evidence card based on UI context.
+- New file revisions create immutable DocumentVersion records; never imply in-place replacement.
