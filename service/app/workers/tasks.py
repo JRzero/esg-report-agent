@@ -9,7 +9,7 @@ from app.core.config import get_settings
 from app.core.database import SessionLocal
 from app.integrations.parsers import parse_document
 from app.integrations.storage import storage
-from app.modules.models import AITask, ContextBinding, Document, DocumentAnchor, DocumentVersion
+from app.modules.models import AITask, ContextBinding, Document, DocumentAnchor, DocumentVersion, ReportSection
 from app.modules.services import TaskService
 from app.workers.celery_app import celery_app
 
