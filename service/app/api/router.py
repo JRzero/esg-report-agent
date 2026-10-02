@@ -612,6 +612,19 @@ async def facts(
     return await FactService(db).list(project_id)
 
 
+@router.get("/facts/{fact_id}", tags=["Facts"])
+async def fact_detail(
+    fact_id: UUID,
+    ctx: RequestContext = Depends(current_context),
+    db: AsyncSession = Depends(get_db),
+):
+    fact = await db.get(Fact, fact_id)
+    if not fact or fact.deleted_at is not None:
+        raise NotFound("FACT_NOT_FOUND", "Fact not found")
+    await ProjectAccess(db).require(fact.project_id, ctx.membership_id, "VIEW_FACT")
+    return fact
+
+
 @router.post("/projects/{project_id}/facts", status_code=201, tags=["Facts"])
 async def create_fact(
     project_id: UUID,
@@ -777,6 +790,43 @@ async def fact_conflicts(
             )
         ).all()
     )
+
+
+@router.get("/fact-conflicts/{group_id}", tags=["Facts"])
+async def fact_conflict_detail(
+    group_id: UUID,
+    ctx: RequestContext = Depends(current_context),
+    db: AsyncSession = Depends(get_db),
+):
+    group = await db.get(FactConflictGroup, group_id)
+    if not group:
+        raise NotFound("FACT_CONFLICT_NOT_FOUND", "Fact conflict not found")
+    await ProjectAccess(db).require(group.project_id, ctx.membership_id, "VIEW_FACT")
+    members = list(
+        (
+            await db.scalars(
+                select(Fact)
+                .join(FactConflictMember, FactConflictMember.fact_id == Fact.id)
+                .where(FactConflictMember.conflict_group_id == group.id)
+                .order_by(Fact.created_at.asc())
+            )
+        ).all()
+    )
+    return {
+        "group": {
+            "id": group.id,
+            "project_id": group.project_id,
+            "semantic_key": group.semantic_key,
+            "conflict_type": group.conflict_type,
+            "status": group.status,
+            "resolved_fact_id": group.resolved_fact_id,
+            "resolved_by": group.resolved_by,
+            "resolved_at": group.resolved_at,
+            "created_at": group.created_at,
+            "updated_at": group.updated_at,
+        },
+        "members": members,
+    }
 
 
 @router.post("/fact-conflicts/{group_id}/resolve", tags=["Facts"])
