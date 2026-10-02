@@ -575,6 +575,21 @@ async def test_fact_conflict_detail_and_human_resolution(client):
     member_ids = {item["id"] for item in detail.json()["members"]}
     assert member_ids == {first.json()["id"], second.json()["id"]}
 
+    direct_confirm = await client.post(
+        f"/api/v1/facts/{first.json()['id']}/confirm",
+        headers=headers,
+    )
+    assert direct_confirm.status_code == 409
+    assert direct_confirm.json()["error"]["code"] == "FACT_CONFLICT_UNRESOLVED"
+
+    direct_reject = await client.post(
+        f"/api/v1/facts/{second.json()['id']}/reject",
+        headers=headers,
+        json={"reason": "must resolve group"},
+    )
+    assert direct_reject.status_code == 409
+    assert direct_reject.json()["error"]["code"] == "FACT_CONFLICT_UNRESOLVED"
+
     resolved = await client.post(
         f"/api/v1/fact-conflicts/{group['id']}/resolve",
         headers=headers,
