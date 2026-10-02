@@ -22,4 +22,9 @@ export const queryKeys = {
   requirements: (projectId: string) => ['projects', projectId, 'requirements'] as const,
   missingItems: (projectId: string) => ['projects', projectId, 'missing-items'] as const,
   reports: (projectId: string) => ['projects', projectId, 'reports'] as const,
+  report: (reportId: string) => ['reports', reportId] as const,
+  sections: (reportId: string) => ['reports', reportId, 'sections'] as const,
+  section: (sectionId: string) => ['sections', sectionId] as const,
+  sectionDisclosures: (sectionId: string) => ['sections', sectionId, 'disclosures'] as const,
+  sectionPlanningContext: (sectionId: string) => ['sections', sectionId, 'planning-context'] as const,
 };
