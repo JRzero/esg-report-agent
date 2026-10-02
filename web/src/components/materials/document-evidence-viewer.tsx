@@ -1,6 +1,6 @@
 'use client';
 
-import {useEffect, useMemo, useState} from 'react';
+import {useState} from 'react';
 import {Badge} from '@astryxdesign/core/Badge';
 import {Button} from '@astryxdesign/core/Button';
 import {Card} from '@astryxdesign/core/Card';
@@ -58,18 +58,10 @@ export function DocumentEvidenceViewer({
 
   const versions = detail.data?.versions ?? [];
   const document = detail.data?.document;
-
-  useEffect(() => {
-    if (!versions.length) return;
-    if (!selectedVersionId || !versions.some((item) => item.id === selectedVersionId)) {
-      setSelectedVersionId(versions[0].id);
-    }
-  }, [selectedVersionId, versions]);
-
-  const selectedVersion = useMemo(
-    () => versions.find((item) => item.id === selectedVersionId) ?? versions[0],
-    [selectedVersionId, versions],
-  );
+  const effectiveVersionId =
+    selectedVersionId || versions[0]?.id || '';
+  const selectedVersion =
+    versions.find((item) => item.id === effectiveVersionId) ?? versions[0];
 
   const uploadVersion = useUploadDocumentVersion(documentId);
   const reprocess = useReprocessVersion(documentId, selectedVersion?.id ?? '');
