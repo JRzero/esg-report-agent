@@ -254,3 +254,131 @@ export type FactConflictDetail = {
   group: FactConflictGroup;
   members: Fact[];
 };
+
+
+export type Standard = {
+  id: string;
+  code: string;
+  name: string;
+  publisher: string | null;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type StandardVersion = {
+  id: string;
+  standard_id: string;
+  version_code: string;
+  name: string;
+  effective_date: string | null;
+  status: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ProjectStandardAttachment = {
+  id: string;
+  is_primary: boolean;
+  standard: Pick<Standard, 'id' | 'code' | 'name' | 'publisher'>;
+  version: {
+    id: string;
+    version_code: string;
+    name: string;
+    effective_date: string | null;
+    status: string;
+  };
+};
+
+export type ProjectDisclosureApplicability =
+  | 'APPLICABLE'
+  | 'NOT_APPLICABLE'
+  | 'UNDETERMINED';
+
+export type ProjectDisclosureCoverage = 'COVERED' | 'PARTIAL' | 'MISSING';
+
+export type ProjectDisclosure = {
+  id: string;
+  disclosure_id: string;
+  code: string;
+  title: string;
+  description: string | null;
+  topic_code: string | null;
+  applicability: ProjectDisclosureApplicability;
+  coverage_status: ProjectDisclosureCoverage;
+  notes: string | null;
+};
+
+export type ProjectRequirementStatusValue =
+  | 'COVERED'
+  | 'PARTIAL'
+  | 'MISSING'
+  | 'NOT_APPLICABLE';
+
+export type ProjectRequirement = {
+  id: string;
+  requirement_id: string;
+  disclosure_id: string;
+  disclosure_code: string;
+  disclosure_title: string;
+  code: string;
+  requirement_type: string;
+  content: string;
+  guidance: string | null;
+  required_data_json: Record<string, unknown>;
+  status: ProjectRequirementStatusValue;
+  reason: string | null;
+};
+
+export type ProjectDisclosureDetail = {
+  project_disclosure: ProjectDisclosure;
+  requirements: Array<
+    Omit<ProjectRequirement, 'disclosure_id' | 'disclosure_code' | 'disclosure_title'>
+  >;
+  fact_maps: Array<{
+    id: string;
+    mapping_type: string;
+    confidence: string | number | null;
+    source_type: string;
+    confirmed: boolean;
+    fact: Fact;
+  }>;
+};
+
+export type ProjectDisclosureUpdateInput = {
+  applicability?: ProjectDisclosureApplicability;
+  notes?: string | null;
+};
+
+export type MissingItemStatus =
+  | 'MISSING'
+  | 'REQUESTED'
+  | 'RECEIVED'
+  | 'RESOLVED'
+  | 'NOT_APPLICABLE';
+
+export type MissingItemPriority = 'LOW' | 'MEDIUM' | 'HIGH';
+
+export type MissingItem = {
+  id: string;
+  tenant_id: string;
+  project_id: string;
+  disclosure_id: string | null;
+  requirement_id: string | null;
+  section_id: string | null;
+  name: string;
+  description: string | null;
+  missing_type: string;
+  priority: MissingItemPriority;
+  status: MissingItemStatus;
+  suggested_material: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MissingItemUpdateInput = {
+  status?: MissingItemStatus;
+  priority?: MissingItemPriority;
+  suggested_material?: string | null;
+};
