@@ -703,6 +703,11 @@ class FactService:
         fact = await self.get(project_id, fact_id)
         if fact.status == "REJECTED":
             raise Conflict("FACT_REJECTED", "Rejected fact cannot be confirmed")
+        if fact.status == "CONFLICT":
+            raise Conflict(
+                "FACT_CONFLICT_UNRESOLVED",
+                "Conflicting fact must be resolved through its conflict group",
+            )
         ev_count = await self.s.scalar(
             select(func.count()).select_from(FactEvidence).where(FactEvidence.fact_id == fact_id)
         )
@@ -725,6 +730,11 @@ class FactService:
 
     async def reject(self, project_id: UUID, fact_id: UUID, user_id: UUID, reason: str):
         fact = await self.get(project_id, fact_id)
+        if fact.status == "CONFLICT":
+            raise Conflict(
+                "FACT_CONFLICT_UNRESOLVED",
+                "Conflicting fact must be resolved through its conflict group",
+            )
         fact.status = "REJECTED"
         fact.confirmed_by = None
         fact.confirmed_at = None
