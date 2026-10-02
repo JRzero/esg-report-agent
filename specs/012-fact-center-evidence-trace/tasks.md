@@ -1,0 +1,21 @@
+# Tasks
+
+- [ ] Expand Service Fact Evidence trace
+- [ ] Add Fact Revision endpoint
+- [ ] Add Service regression tests
+- [ ] Add Fact BFF routes
+- [ ] Add Fact frontend types
+- [ ] Add Fact queries/mutations
+- [ ] Add Fact Center
+- [ ] Add Fact status filtering
+- [ ] Add Fact detail
+- [ ] Add Fact editing
+- [ ] Add confirm/reject
+- [ ] Add Evidence Trace
+- [ ] Add Revision timeline
+- [ ] Add Conflict Center
+- [ ] Add human conflict resolution
+- [ ] Add frontend tests
+- [ ] Run Web CI
+- [ ] Run Service CI
+- [ ] Publish acceptance report
