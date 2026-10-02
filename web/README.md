@@ -161,3 +161,26 @@ Implemented:
 
 GRI coverage is requirement-level and is recomputed from CONFIRMED Facts. Project users can explicitly
 set Disclosure applicability. Missing Items track evidence/data follow-up separately from coverage.
+
+
+## Report Workspace & Section Planning
+
+Implemented:
+
+```text
+/projects/{projectId}/reports
+/projects/{projectId}/reports/{reportId}
+```
+
+The workspace uses a three-column planning layout:
+
+```text
+Section Tree
+   ↓
+Writing Plan
+   ↓
+Scoped Planning Context
+```
+
+AI plans remain DRAFT until a human explicitly confirms them. Section context is supplied by the Service
+and contains only allowed Project/Section Disclosure, Requirement, CONFIRMED Fact, Evidence and Missing Item resources.
