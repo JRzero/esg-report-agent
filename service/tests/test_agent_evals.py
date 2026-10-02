@@ -179,8 +179,18 @@ async def test_section_writing_workflow_fails_closed_on_uncited_factual_claim(cl
         report_section = await session.get(ReportSection, section_id)
         report_section.writing_plan = {
             "version": 1,
+            "source": "HUMAN",
+            "status": "CONFIRMED",
             "goal": "Describe workforce",
+            "recommended_structure": [],
+            "key_messages": [],
+            "disclosure_ids": [],
+            "requirement_ids": [],
             "fact_ids": [str(fact.id)],
+            "evidence_anchor_ids": [],
+            "missing_item_ids": [],
+            "missing_items": [],
+            "warnings": [],
         }
         await session.commit()
 
