@@ -126,13 +126,18 @@ export type DocumentDetail = {
 
 export type AITask = {
   id: string;
+  project_id: string | null;
   task_type: string;
+  target_type: string | null;
+  target_id: string | null;
   status: 'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILED' | 'CANCELLED' | string;
   progress: string | number;
   stage: string | null;
   result_json: Record<string, unknown>;
   error_code: string | null;
   error_message: string | null;
+  created_at: string;
+  completed_at: string | null;
 };
 
 export type UploadDocumentResult = {
@@ -382,3 +387,159 @@ export type MissingItemUpdateInput = {
   priority?: MissingItemPriority;
   suggested_material?: string | null;
 };
+
+
+export type Report = {
+  id: string;
+  tenant_id: string;
+  project_id: string;
+  template_version_id: string | null;
+  title: string;
+  language: string;
+  status: 'DRAFT' | 'COMPLETED' | 'ARCHIVED' | string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ReportCreateInput = {
+  title: string;
+  language?: string;
+  template_version_id?: string | null;
+};
+
+export type SectionWritingPlanStatus = 'DRAFT' | 'CONFIRMED';
+
+export type SectionWritingPlan = {
+  version: number;
+  source: 'AI' | 'HUMAN' | string;
+  status: SectionWritingPlanStatus;
+  goal: string;
+  recommended_structure: string[];
+  key_messages: string[];
+  disclosure_ids: string[];
+  requirement_ids: string[];
+  fact_ids: string[];
+  evidence_anchor_ids: string[];
+  missing_item_ids: string[];
+  missing_items: string[];
+  warnings: string[];
+};
+
+export type ReportSection = {
+  id: string;
+  tenant_id: string;
+  project_id: string;
+  report_id: string;
+  parent_id: string | null;
+  source_template_section_id: string | null;
+  title: string;
+  description: string | null;
+  level: number;
+  sort_order: number;
+  status: 'NOT_STARTED' | 'GENERATING' | 'DRAFT' | 'COMPLETED' | string;
+  writing_plan: Partial<SectionWritingPlan>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SectionCreateInput = {
+  title: string;
+  parent_id?: string | null;
+  level?: number;
+  sort_order?: number;
+  description?: string | null;
+};
+
+export type SectionUpdateInput = Partial<SectionCreateInput> & {
+  status?: 'NOT_STARTED' | 'GENERATING' | 'DRAFT' | 'COMPLETED';
+};
+
+export type SectionDisclosureMapping = {
+  mapping_id: string;
+  mapping_type: string;
+  disclosure_id: string;
+  code: string;
+  title: string;
+  applicability: ProjectDisclosureApplicability;
+  coverage_status: ProjectDisclosureCoverage;
+};
+
+export type SectionPlanningContext = {
+  section: {
+    id: string;
+    title: string;
+    description: string | null;
+  };
+  disclosures: Array<{
+    mapping_id: string;
+    id: string;
+    code: string;
+    title: string;
+    applicability: ProjectDisclosureApplicability;
+    coverage_status: ProjectDisclosureCoverage;
+  }>;
+  requirements: Array<{
+    id: string;
+    disclosure_id: string;
+    disclosure_code: string;
+    code: string;
+    content: string;
+    status: ProjectRequirementStatusValue;
+    reason: string | null;
+    required_data_json: Record<string, unknown>;
+  }>;
+  facts: Array<{
+    id: string;
+    name: string;
+    value_type: FactValueType;
+    number_value: string | number | null;
+    text_value: string | null;
+    boolean_value: boolean | null;
+    date_value: string | null;
+    json_value: Record<string, unknown> | null;
+    raw_value: string | null;
+    unit: string | null;
+    period_start: string | null;
+    period_end: string | null;
+    entity_scope: string | null;
+    semantic_key: string;
+  }>;
+  evidence: Array<{
+    fact_id: string;
+    fact_evidence_id: string;
+    evidence_role: string;
+    anchor_id: string;
+    anchor_type: string;
+    page_start: number | null;
+    page_end: number | null;
+    sheet_name: string | null;
+    cell_range: string | null;
+    heading_path: string[] | null;
+    paragraph_start: number | null;
+    paragraph_end: number | null;
+    slide_number: number | null;
+    raw_text: string;
+    document_id: string;
+    document_name: string;
+    document_version_id: string;
+    document_version_no: number;
+  }>;
+  missing_items: Array<{
+    id: string;
+    disclosure_id: string | null;
+    requirement_id: string | null;
+    name: string;
+    description: string | null;
+    missing_type: string;
+    priority: MissingItemPriority;
+    status: MissingItemStatus;
+    suggested_material: string | null;
+  }>;
+  warnings: string[];
+};
+
+export type SectionWritingPlanInput = Omit<
+  SectionWritingPlan,
+  'version' | 'source'
+>;
