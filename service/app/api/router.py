@@ -77,6 +77,7 @@ from app.modules.schemas import (
     ReportTemplateVersionCreate,
     SectionCreate,
     SectionUpdate,
+    SectionWritingPlanUpdate,
     TaskRead,
     TemplateSectionCreate,
     TokenResponse,
@@ -1388,6 +1389,17 @@ async def sections(
     )
 
 
+@router.get("/sections/{section_id}", tags=["Reports"])
+async def section_detail(
+    section_id: UUID,
+    ctx: RequestContext = Depends(current_context),
+    db: AsyncSession = Depends(get_db),
+):
+    section = await _section(db, section_id)
+    await ProjectAccess(db).require(section.project_id, ctx.membership_id, "VIEW_PROJECT")
+    return section
+
+
 @router.patch("/sections/{section_id}", tags=["Reports"])
 async def update_section(
     section_id: UUID,
@@ -1404,6 +1416,10 @@ async def update_section(
             raise DomainError("INVALID_SECTION_PARENT", "Invalid parent section", 422)
     for key, value in values.items():
         setattr(section, key, value)
+    if {"title", "description", "parent_id", "level"} & set(values):
+        section.writing_plan = {}
+        if section.status != "COMPLETED":
+            section.status = "NOT_STARTED"
     await db.commit()
     return section
 
@@ -1420,6 +1436,17 @@ async def map_section_disclosure(
     disclosure = await db.get(Disclosure, disclosure_id)
     if not disclosure:
         raise NotFound("DISCLOSURE_NOT_FOUND", "Disclosure not found")
+    project_disclosure = await db.scalar(
+        select(ProjectDisclosure).where(
+            ProjectDisclosure.project_id == section.project_id,
+            ProjectDisclosure.disclosure_id == disclosure_id,
+        )
+    )
+    if not project_disclosure:
+        raise Conflict(
+            "DISCLOSURE_NOT_ATTACHED_TO_PROJECT",
+            "Section can only map disclosures attached to the same project",
+        )
     existing = await db.scalar(
         select(SectionDisclosureMap).where(
             SectionDisclosureMap.section_id == section_id,
@@ -1430,9 +1457,106 @@ async def map_section_disclosure(
         return existing
     mapping = SectionDisclosureMap(section_id=section_id, disclosure_id=disclosure_id)
     db.add(mapping)
+    section.writing_plan = {}
+    if section.status != "COMPLETED":
+        section.status = "NOT_STARTED"
     await db.commit()
     await db.refresh(mapping)
     return mapping
+
+
+@router.get("/sections/{section_id}/disclosures", tags=["Reports"])
+async def section_disclosures(
+    section_id: UUID,
+    ctx: RequestContext = Depends(current_context),
+    db: AsyncSession = Depends(get_db),
+):
+    section = await _section(db, section_id)
+    await ProjectAccess(db).require(section.project_id, ctx.membership_id, "VIEW_PROJECT")
+    rows = (
+        await db.execute(
+            select(SectionDisclosureMap, Disclosure, ProjectDisclosure)
+            .join(Disclosure, SectionDisclosureMap.disclosure_id == Disclosure.id)
+            .join(
+                ProjectDisclosure,
+                (ProjectDisclosure.disclosure_id == Disclosure.id)
+                & (ProjectDisclosure.project_id == section.project_id),
+            )
+            .where(SectionDisclosureMap.section_id == section_id)
+            .order_by(Disclosure.sort_order, Disclosure.code)
+        )
+    ).all()
+    return [
+        {
+            "mapping_id": mapping.id,
+            "mapping_type": mapping.mapping_type,
+            "disclosure_id": disclosure.id,
+            "code": disclosure.code,
+            "title": disclosure.title,
+            "applicability": project_disclosure.applicability,
+            "coverage_status": project_disclosure.coverage_status,
+        }
+        for mapping, disclosure, project_disclosure in rows
+    ]
+
+
+@router.delete(
+    "/sections/{section_id}/disclosures/{disclosure_id}",
+    status_code=204,
+    tags=["Reports"],
+)
+async def unmap_section_disclosure(
+    section_id: UUID,
+    disclosure_id: UUID,
+    ctx: RequestContext = Depends(current_context),
+    db: AsyncSession = Depends(get_db),
+):
+    section = await _section(db, section_id)
+    await ProjectAccess(db).require(section.project_id, ctx.membership_id, "EDIT_REPORT")
+    mapping = await db.scalar(
+        select(SectionDisclosureMap).where(
+            SectionDisclosureMap.section_id == section_id,
+            SectionDisclosureMap.disclosure_id == disclosure_id,
+        )
+    )
+    if not mapping:
+        raise NotFound("SECTION_DISCLOSURE_MAP_NOT_FOUND", "Section disclosure map not found")
+    await db.delete(mapping)
+    section.writing_plan = {}
+    if section.status != "COMPLETED":
+        section.status = "NOT_STARTED"
+    await db.commit()
+
+
+@router.get("/sections/{section_id}/planning-context", tags=["Reports"])
+async def section_planning_context(
+    section_id: UUID,
+    ctx: RequestContext = Depends(current_context),
+    db: AsyncSession = Depends(get_db),
+):
+    section = await _section(db, section_id)
+    await ProjectAccess(db).require(section.project_id, ctx.membership_id, "VIEW_PROJECT")
+    return await ReportService(db).section_planning_context(section.project_id, section_id)
+
+
+@router.put("/sections/{section_id}/writing-plan", tags=["Reports"])
+async def update_section_writing_plan(
+    section_id: UUID,
+    body: SectionWritingPlanUpdate,
+    ctx: RequestContext = Depends(current_context),
+    db: AsyncSession = Depends(get_db),
+):
+    section = await _section(db, section_id)
+    await ProjectAccess(db).require(section.project_id, ctx.membership_id, "EDIT_REPORT")
+    plan = await ReportService(db).save_section_writing_plan(
+        section.project_id,
+        section.id,
+        body,
+        source="HUMAN",
+        status=body.status,
+    )
+    await db.commit()
+    return plan
 
 
 @router.get("/sections/{section_id}/blocks", tags=["Reports"])
