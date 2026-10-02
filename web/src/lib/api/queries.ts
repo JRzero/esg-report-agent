@@ -79,6 +79,15 @@ export function useDocument(documentId: string) {
     queryFn: () =>
       browserRequest<DocumentDetail>(`/api/documents/${documentId}`),
     enabled: Boolean(documentId),
+    refetchInterval: (query) => {
+      const versions = query.state.data?.versions ?? [];
+      return versions.some((version) =>
+        [version.validation_status, version.evidence_parse_status, version.context_status]
+          .some((status) => status === 'PENDING' || status === 'PROCESSING'),
+      )
+        ? 2000
+        : false;
+    },
   });
 }
 
