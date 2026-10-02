@@ -1805,7 +1805,9 @@ async def plan(
 ):
     section = await _section(db, section_id)
     await ProjectAccess(db).require(section.project_id, ctx.membership_id, "GENERATE_REPORT")
-    return await queue_ai(
+    section.status = "GENERATING"
+    await db.flush()
+    task = await queue_ai(
         db,
         ctx,
         section.project_id,
@@ -1814,6 +1816,8 @@ async def plan(
         section_id,
         idempotency_key,
     )
+    await db.commit()
+    return task
 
 
 @router.post("/sections/{section_id}/ai/generate", status_code=202, tags=["AI"])
