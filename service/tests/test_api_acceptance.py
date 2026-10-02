@@ -225,6 +225,7 @@ async def test_evidence_fact_gri_report_citation_export_e2e(client):
         await session.commit()
         metric_id = str(metric.id)
         standard_version_id = str(version.id)
+        disclosure_id = str(disclosure.id)
 
     fact_response = await client.post(
         f"/api/v1/projects/{project_id}/facts",
@@ -317,6 +318,12 @@ async def test_evidence_fact_gri_report_citation_export_e2e(client):
     sections = await client.get(f"/api/v1/reports/{report_id}/sections", headers=headers)
     section_id = sections.json()[0]["id"]
 
+    mapped_section_disclosure = await client.post(
+        f"/api/v1/sections/{section_id}/disclosures/{disclosure_id}",
+        headers=headers,
+    )
+    assert mapped_section_disclosure.status_code == 201, mapped_section_disclosure.text
+
     class FakeLLM:
         async def generate_structured(self, system, user, schema, model_profile="STRONG"):
             if schema is SectionPlan:
@@ -348,7 +355,28 @@ async def test_evidence_fact_gri_report_citation_export_e2e(client):
             UUID(project_id), UUID(section_id)
         )
         assert plan["fact_ids"] == [fact_id]
+        assert plan["status"] == "DRAFT"
         await session.commit()
+
+    confirm_plan = await client.put(
+        f"/api/v1/sections/{section_id}/writing-plan",
+        headers=headers,
+        json={
+            "goal": plan["goal"],
+            "recommended_structure": plan["recommended_structure"],
+            "key_messages": plan["key_messages"],
+            "disclosure_ids": plan["disclosure_ids"],
+            "requirement_ids": plan["requirement_ids"],
+            "fact_ids": plan["fact_ids"],
+            "evidence_anchor_ids": plan["evidence_anchor_ids"],
+            "missing_item_ids": plan["missing_item_ids"],
+            "missing_items": plan["missing_items"],
+            "warnings": plan["warnings"],
+            "status": "CONFIRMED",
+        },
+    )
+    assert confirm_plan.status_code == 200, confirm_plan.text
+    assert confirm_plan.json()["status"] == "CONFIRMED"
 
     async with SessionLocal() as session:
         blocks = await SectionWritingWorkflow(session, FakeLLM()).run(
