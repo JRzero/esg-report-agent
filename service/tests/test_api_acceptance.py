@@ -608,3 +608,225 @@ async def test_fact_conflict_detail_and_human_resolution(client):
     )
     assert detail_after.json()["group"]["status"] == "RESOLVED"
     assert detail_after.json()["group"]["resolved_fact_id"] == first.json()["id"]
+
+
+@pytest.mark.asyncio
+async def test_gri_workspace_applicability_mapping_and_missing_workflow(client):
+    await seed_tenant()
+    headers = await login(client, "admin@example.com")
+    _, project_id = await create_company_project(client, headers)
+
+    async with SessionLocal() as session:
+        metric = MetricDefinition(
+            code="EMPLOYEE_TOTAL_GRI_TEST",
+            name="Employee total GRI test",
+            data_type="NUMBER",
+            default_unit="person",
+        )
+        standard = Standard(
+            code="GRI-TEST",
+            name="GRI Test Standard",
+            publisher="Test Publisher",
+        )
+        session.add_all([metric, standard])
+        await session.flush()
+        version = StandardVersion(
+            standard_id=standard.id,
+            version_code="2021",
+            name="GRI Test 2021",
+        )
+        session.add(version)
+        await session.flush()
+        disclosure = Disclosure(
+            standard_version_id=version.id,
+            code="GRI TEST 2-7",
+            title="Employees",
+            sort_order=1,
+        )
+        session.add(disclosure)
+        await session.flush()
+        session.add_all(
+            [
+                DisclosureRequirement(
+                    disclosure_id=disclosure.id,
+                    requirement_code="a",
+                    content="Report total employees.",
+                    required_data_json={"metric_codes": ["EMPLOYEE_TOTAL_GRI_TEST"]},
+                    sort_order=1,
+                ),
+                DisclosureRequirement(
+                    disclosure_id=disclosure.id,
+                    requirement_code="b",
+                    content="Report employee breakdown.",
+                    required_data_json={"metric_codes": ["EMPLOYEE_BREAKDOWN_GRI_TEST"]},
+                    sort_order=2,
+                ),
+            ]
+        )
+        await session.commit()
+        metric_id = str(metric.id)
+        standard_id = str(standard.id)
+        version_id = str(version.id)
+
+    attach = await client.post(
+        f"/api/v1/projects/{project_id}/standards/{version_id}",
+        headers=headers,
+    )
+    assert attach.status_code == 201, attach.text
+
+    project_standards = await client.get(
+        f"/api/v1/projects/{project_id}/standards",
+        headers=headers,
+    )
+    assert project_standards.status_code == 200, project_standards.text
+    attached = next(
+        item for item in project_standards.json() if item["standard"]["id"] == standard_id
+    )
+    assert attached["version"]["id"] == version_id
+    assert attached["is_primary"] is True
+
+    fact = await client.post(
+        f"/api/v1/projects/{project_id}/facts",
+        headers=headers,
+        json={
+            "fact_type": "METRIC",
+            "metric_definition_id": metric_id,
+            "metric_code": "EMPLOYEE_TOTAL_GRI_TEST",
+            "name": "Employee total",
+            "value_type": "NUMBER",
+            "number_value": 1287,
+            "unit": "person",
+            "period_start": "2026-01-01",
+            "period_end": "2026-12-31",
+            "entity_scope": "GROUP",
+            "source_type": "HUMAN",
+        },
+    )
+    assert fact.status_code == 201, fact.text
+    fact_id = fact.json()["id"]
+    confirmed = await client.post(f"/api/v1/facts/{fact_id}/confirm", headers=headers)
+    assert confirmed.status_code == 200, confirmed.text
+
+    mapping = await client.post(
+        f"/api/v1/projects/{project_id}/ai/disclosure-mapping",
+        headers=headers,
+    )
+    assert mapping.status_code == 200, mapping.text
+    assert mapping.json()["mappings_created"] == 1
+
+    disclosures = await client.get(
+        f"/api/v1/projects/{project_id}/disclosures",
+        headers=headers,
+    )
+    project_disclosure = next(
+        item for item in disclosures.json() if item["code"] == "GRI TEST 2-7"
+    )
+    assert project_disclosure["coverage_status"] == "PARTIAL"
+    assert project_disclosure["disclosure_id"]
+
+    detail = await client.get(
+        f"/api/v1/projects/{project_id}/disclosures/{project_disclosure['id']}",
+        headers=headers,
+    )
+    assert detail.status_code == 200, detail.text
+    detail_json = detail.json()
+    requirement_statuses = {
+        item["code"]: item["status"] for item in detail_json["requirements"]
+    }
+    assert requirement_statuses == {"a": "COVERED", "b": "MISSING"}
+    assert [item["fact"]["id"] for item in detail_json["fact_maps"]] == [fact_id]
+
+    requirements = await client.get(
+        f"/api/v1/projects/{project_id}/requirements",
+        headers=headers,
+    )
+    assert requirements.status_code == 200
+    requirement = next(item for item in requirements.json() if item["code"] == "a")
+    assert requirement["disclosure_code"] == "GRI TEST 2-7"
+    assert requirement["disclosure_title"] == "Employees"
+
+    not_applicable = await client.patch(
+        f"/api/v1/projects/{project_id}/disclosures/{project_disclosure['id']}",
+        headers=headers,
+        json={
+            "applicability": "NOT_APPLICABLE",
+            "notes": "Not applicable for this project.",
+        },
+    )
+    assert not_applicable.status_code == 200, not_applicable.text
+    assert not_applicable.json()["applicability"] == "NOT_APPLICABLE"
+
+    na_detail = await client.get(
+        f"/api/v1/projects/{project_id}/disclosures/{project_disclosure['id']}",
+        headers=headers,
+    )
+    assert {item["status"] for item in na_detail.json()["requirements"]} == {
+        "NOT_APPLICABLE"
+    }
+    assert na_detail.json()["fact_maps"] == []
+
+    applicable = await client.patch(
+        f"/api/v1/projects/{project_id}/disclosures/{project_disclosure['id']}",
+        headers=headers,
+        json={"applicability": "APPLICABLE"},
+    )
+    assert applicable.status_code == 200, applicable.text
+
+    restored_detail = await client.get(
+        f"/api/v1/projects/{project_id}/disclosures/{project_disclosure['id']}",
+        headers=headers,
+    )
+    restored = {
+        item["code"]: item["status"] for item in restored_detail.json()["requirements"]
+    }
+    assert restored == {"a": "COVERED", "b": "MISSING"}
+    assert [item["fact"]["id"] for item in restored_detail.json()["fact_maps"]] == [fact_id]
+
+    missing_analysis = await client.post(
+        f"/api/v1/projects/{project_id}/ai/missing-data-analysis",
+        headers=headers,
+    )
+    assert missing_analysis.status_code == 200, missing_analysis.text
+    assert missing_analysis.json()["missing_items_created"] == 1
+
+    missing_items = await client.get(
+        f"/api/v1/projects/{project_id}/missing-items",
+        headers=headers,
+    )
+    assert missing_items.status_code == 200, missing_items.text
+    missing_item = next(
+        item for item in missing_items.json() if item["requirement_id"]
+    )
+    assert missing_item["status"] == "MISSING"
+
+    for status in ["REQUESTED", "RECEIVED", "RESOLVED"]:
+        updated = await client.patch(
+            f"/api/v1/missing-items/{missing_item['id']}",
+            headers=headers,
+            json={"status": status},
+        )
+        assert updated.status_code == 200, updated.text
+        assert updated.json()["status"] == status
+
+    rejected = await client.post(
+        f"/api/v1/facts/{fact_id}/reject",
+        headers=headers,
+        json={"reason": "Superseded by corrected data"},
+    )
+    assert rejected.status_code == 200, rejected.text
+
+    remap = await client.post(
+        f"/api/v1/projects/{project_id}/ai/disclosure-mapping",
+        headers=headers,
+    )
+    assert remap.status_code == 200, remap.text
+    assert remap.json()["mappings_created"] == 0
+
+    stale_free_detail = await client.get(
+        f"/api/v1/projects/{project_id}/disclosures/{project_disclosure['id']}",
+        headers=headers,
+    )
+    assert stale_free_detail.json()["fact_maps"] == []
+    assert {
+        item["status"] for item in stale_free_detail.json()["requirements"]
+    } == {"MISSING"}

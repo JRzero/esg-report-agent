@@ -13,6 +13,13 @@ export const queryKeys = {
   factRevisions: (factId: string) => ['facts', factId, 'revisions'] as const,
   factConflicts: (projectId: string) => ['projects', projectId, 'fact-conflicts'] as const,
   factConflict: (groupId: string) => ['fact-conflicts', groupId] as const,
+  standards: ['standards'] as const,
+  standardVersions: (standardId: string) => ['standards', standardId, 'versions'] as const,
+  projectStandards: (projectId: string) => ['projects', projectId, 'standards'] as const,
   disclosures: (projectId: string) => ['projects', projectId, 'disclosures'] as const,
+  disclosure: (projectId: string, projectDisclosureId: string) =>
+    ['projects', projectId, 'disclosures', projectDisclosureId] as const,
+  requirements: (projectId: string) => ['projects', projectId, 'requirements'] as const,
+  missingItems: (projectId: string) => ['projects', projectId, 'missing-items'] as const,
   reports: (projectId: string) => ['projects', projectId, 'reports'] as const,
 };

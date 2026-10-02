@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -928,7 +928,59 @@ class StandardService:
                     )
         return ps
 
+    async def update_project_disclosure(self, project_id: UUID, project_disclosure_id: UUID, data):
+        project_disclosure = await self.s.scalar(
+            select(ProjectDisclosure).where(
+                ProjectDisclosure.id == project_disclosure_id,
+                ProjectDisclosure.project_id == project_id,
+            )
+        )
+        if not project_disclosure:
+            raise NotFound("PROJECT_DISCLOSURE_NOT_FOUND", "Project disclosure not found")
+
+        values = data.model_dump(exclude_unset=True)
+        for key, value in values.items():
+            setattr(project_disclosure, key, value)
+
+        if "applicability" in values:
+            requirements = list(
+                (
+                    await self.s.scalars(
+                        select(ProjectRequirementStatus)
+                        .join(
+                            DisclosureRequirement,
+                            ProjectRequirementStatus.requirement_id == DisclosureRequirement.id,
+                        )
+                        .where(
+                            ProjectRequirementStatus.project_id == project_id,
+                            DisclosureRequirement.disclosure_id == project_disclosure.disclosure_id,
+                        )
+                    )
+                ).all()
+            )
+            if project_disclosure.applicability == "NOT_APPLICABLE":
+                for requirement_status in requirements:
+                    requirement_status.status = "NOT_APPLICABLE"
+                    requirement_status.reason = "Disclosure marked not applicable by project user"
+                await self.s.execute(
+                    delete(DisclosureFactMap).where(
+                        DisclosureFactMap.project_id == project_id,
+                        DisclosureFactMap.disclosure_id == project_disclosure.disclosure_id,
+                        DisclosureFactMap.source_type == "RULE",
+                    )
+                )
+            else:
+                await self.map_confirmed_facts(project_id)
+
+        return project_disclosure
+
     async def map_confirmed_facts(self, project_id: UUID):
+        await self.s.execute(
+            delete(DisclosureFactMap).where(
+                DisclosureFactMap.project_id == project_id,
+                DisclosureFactMap.source_type == "RULE",
+            )
+        )
         facts = list(
             (
                 await self.s.scalars(
@@ -965,6 +1017,19 @@ class StandardService:
                     )
                 ).all()
             )
+            if pd.applicability == "NOT_APPLICABLE":
+                for requirement in requirements:
+                    status = await self.s.scalar(
+                        select(ProjectRequirementStatus).where(
+                            ProjectRequirementStatus.project_id == project_id,
+                            ProjectRequirementStatus.requirement_id == requirement.id,
+                        )
+                    )
+                    if status:
+                        status.status = "NOT_APPLICABLE"
+                        status.reason = "Disclosure marked not applicable by project user"
+                continue
+
             covered = 0
             for requirement in requirements:
                 codes = set((requirement.required_data_json or {}).get("metric_codes", []))

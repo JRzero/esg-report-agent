@@ -66,3 +66,13 @@ Do not add a general rich-text editor in Spec 009. The Report Workspace gets a d
 - Fact Evidence must display and link to the exact Service DocumentVersion + DocumentAnchor.
 - Fact Revision history is read-only/append-only.
 - Do not infer Evidence from Reference or Standard material.
+
+
+## GRI / Missing Data
+- Requirement coverage is derived from confirmed Facts plus explicit project applicability.
+- PENDING, CONFLICT and REJECTED Facts must never be presented as satisfying GRI coverage.
+- NOT_APPLICABLE is a human project decision; do not infer or auto-select it in the UI.
+- Missing Item workflow state is operational follow-up state, not disclosure coverage.
+- RECEIVED or RESOLVED Missing Item does not imply COVERED Requirement.
+- Link mapped Facts back to Fact Center rather than duplicating fact editing inside GRI.
+- After Fact Mapping/applicability changes, invalidate Disclosure, Requirement and detail queries.

@@ -22,6 +22,7 @@ from app.modules.models import (
     Claim,
     Disclosure,
     DisclosureRequirement,
+    DisclosureFactMap,
     Document,
     DocumentAnchor,
     DocumentVersion,
@@ -34,6 +35,7 @@ from app.modules.models import (
     ProjectDisclosure,
     ProjectMember,
     ProjectRequirementStatus,
+    ProjectStandard,
     Report,
     ReportBlock,
     ReportBlockRevision,
@@ -62,6 +64,7 @@ from app.modules.schemas import (
     LoginRequest,
     MembershipRead,
     MissingItemUpdate,
+    ProjectDisclosureUpdate,
     ProjectCreate,
     ProjectMemberCreate,
     ProjectMemberRead,
@@ -924,6 +927,44 @@ async def disclosure_requirements(
     )
 
 
+@router.get("/projects/{project_id}/standards", tags=["Standards"])
+async def project_standards(
+    project_id: UUID,
+    ctx: RequestContext = Depends(current_context),
+    db: AsyncSession = Depends(get_db),
+):
+    await ProjectAccess(db).require(project_id, ctx.membership_id, "VIEW_PROJECT")
+    rows = (
+        await db.execute(
+            select(ProjectStandard, StandardVersion, Standard)
+            .join(StandardVersion, ProjectStandard.standard_version_id == StandardVersion.id)
+            .join(Standard, StandardVersion.standard_id == Standard.id)
+            .where(ProjectStandard.project_id == project_id)
+            .order_by(ProjectStandard.is_primary.desc(), Standard.code, StandardVersion.version_code)
+        )
+    ).all()
+    return [
+        {
+            "id": project_standard.id,
+            "is_primary": project_standard.is_primary,
+            "standard": {
+                "id": standard.id,
+                "code": standard.code,
+                "name": standard.name,
+                "publisher": standard.publisher,
+            },
+            "version": {
+                "id": version.id,
+                "version_code": version.version_code,
+                "name": version.name,
+                "effective_date": version.effective_date,
+                "status": version.status,
+            },
+        }
+        for project_standard, version, standard in rows
+    ]
+
+
 @router.post("/projects/{project_id}/standards/{version_id}", status_code=201, tags=["Standards"])
 async def attach_standard(
     project_id: UUID,
@@ -965,13 +1006,123 @@ async def project_disclosures(
     return [
         {
             "id": pd.id,
+            "disclosure_id": disclosure.id,
             "code": disclosure.code,
             "title": disclosure.title,
+            "description": disclosure.description,
+            "topic_code": disclosure.topic_code,
             "applicability": pd.applicability,
             "coverage_status": pd.coverage_status,
+            "notes": pd.notes,
         }
         for pd, disclosure in rows
     ]
+
+
+@router.get("/projects/{project_id}/disclosures/{project_disclosure_id}", tags=["Standards"])
+async def project_disclosure_detail(
+    project_id: UUID,
+    project_disclosure_id: UUID,
+    ctx: RequestContext = Depends(current_context),
+    db: AsyncSession = Depends(get_db),
+):
+    await ProjectAccess(db).require(project_id, ctx.membership_id, "VIEW_PROJECT")
+    row = (
+        await db.execute(
+            select(ProjectDisclosure, Disclosure)
+            .join(Disclosure, ProjectDisclosure.disclosure_id == Disclosure.id)
+            .where(
+                ProjectDisclosure.id == project_disclosure_id,
+                ProjectDisclosure.project_id == project_id,
+            )
+        )
+    ).first()
+    if not row:
+        raise NotFound("PROJECT_DISCLOSURE_NOT_FOUND", "Project disclosure not found")
+    project_disclosure, disclosure = row
+
+    requirement_rows = (
+        await db.execute(
+            select(ProjectRequirementStatus, DisclosureRequirement)
+            .join(
+                DisclosureRequirement,
+                ProjectRequirementStatus.requirement_id == DisclosureRequirement.id,
+            )
+            .where(
+                ProjectRequirementStatus.project_id == project_id,
+                DisclosureRequirement.disclosure_id == disclosure.id,
+            )
+            .order_by(DisclosureRequirement.sort_order, DisclosureRequirement.requirement_code)
+        )
+    ).all()
+
+    fact_rows = (
+        await db.execute(
+            select(DisclosureFactMap, Fact)
+            .join(Fact, DisclosureFactMap.fact_id == Fact.id)
+            .where(
+                DisclosureFactMap.project_id == project_id,
+                DisclosureFactMap.disclosure_id == disclosure.id,
+                Fact.status == "CONFIRMED",
+            )
+            .order_by(Fact.name)
+        )
+    ).all()
+
+    return {
+        "project_disclosure": {
+            "id": project_disclosure.id,
+            "disclosure_id": disclosure.id,
+            "code": disclosure.code,
+            "title": disclosure.title,
+            "description": disclosure.description,
+            "topic_code": disclosure.topic_code,
+            "applicability": project_disclosure.applicability,
+            "coverage_status": project_disclosure.coverage_status,
+            "notes": project_disclosure.notes,
+        },
+        "requirements": [
+            {
+                "id": status.id,
+                "requirement_id": requirement.id,
+                "code": requirement.requirement_code,
+                "requirement_type": requirement.requirement_type,
+                "content": requirement.content,
+                "guidance": requirement.guidance,
+                "required_data_json": requirement.required_data_json,
+                "status": status.status,
+                "reason": status.reason,
+            }
+            for status, requirement in requirement_rows
+        ],
+        "fact_maps": [
+            {
+                "id": mapping.id,
+                "mapping_type": mapping.mapping_type,
+                "confidence": mapping.confidence,
+                "source_type": mapping.source_type,
+                "confirmed": mapping.confirmed,
+                "fact": fact,
+            }
+            for mapping, fact in fact_rows
+        ],
+    }
+
+
+@router.patch("/projects/{project_id}/disclosures/{project_disclosure_id}", tags=["Standards"])
+async def update_project_disclosure(
+    project_id: UUID,
+    project_disclosure_id: UUID,
+    body: ProjectDisclosureUpdate,
+    ctx: RequestContext = Depends(current_context),
+    db: AsyncSession = Depends(get_db),
+):
+    await ProjectAccess(db).require(project_id, ctx.membership_id, "EDIT_PROJECT")
+    obj = await StandardService(db).update_project_disclosure(
+        project_id, project_disclosure_id, body
+    )
+    await db.commit()
+    return obj
 
 
 @router.get("/projects/{project_id}/requirements", tags=["Standards"])
@@ -982,24 +1133,32 @@ async def project_requirements(
 ):
     await ProjectAccess(db).require(project_id, ctx.membership_id, "VIEW_PROJECT")
     query = (
-        select(ProjectRequirementStatus, DisclosureRequirement)
+        select(ProjectRequirementStatus, DisclosureRequirement, Disclosure)
         .join(
             DisclosureRequirement,
             ProjectRequirementStatus.requirement_id == DisclosureRequirement.id,
         )
+        .join(Disclosure, DisclosureRequirement.disclosure_id == Disclosure.id)
         .where(ProjectRequirementStatus.project_id == project_id)
+        .order_by(Disclosure.sort_order, DisclosureRequirement.sort_order)
     )
     rows = (await db.execute(query)).all()
     return [
         {
             "id": status.id,
             "requirement_id": requirement.id,
+            "disclosure_id": disclosure.id,
+            "disclosure_code": disclosure.code,
+            "disclosure_title": disclosure.title,
             "code": requirement.requirement_code,
+            "requirement_type": requirement.requirement_type,
             "content": requirement.content,
+            "guidance": requirement.guidance,
+            "required_data_json": requirement.required_data_json,
             "status": status.status,
             "reason": status.reason,
         }
-        for status, requirement in rows
+        for status, requirement, disclosure in rows
     ]
 
 

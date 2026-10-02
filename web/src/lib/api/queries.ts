@@ -14,10 +14,19 @@ import type {
   FactEvidenceTrace,
   FactRevision,
   FactUpdateInput,
+  MissingItem,
+  MissingItemUpdateInput,
   Project,
   ProjectCreateInput,
+  ProjectDisclosure,
+  ProjectDisclosureDetail,
+  ProjectDisclosureUpdateInput,
+  ProjectRequirement,
+  ProjectStandardAttachment,
   QueueTaskResult,
   SessionIdentity,
+  Standard,
+  StandardVersion,
   UploadDocumentResult,
 } from './types';
 import {queryKeys} from '@/lib/query/query-keys';
@@ -324,6 +333,184 @@ export function useResolveFactConflict(projectId: string, groupId: string) {
       void queryClient.invalidateQueries({queryKey: queryKeys.facts(projectId)});
       void queryClient.invalidateQueries({queryKey: queryKeys.factConflicts(projectId)});
       void queryClient.invalidateQueries({queryKey: queryKeys.factConflict(groupId)});
+    },
+  });
+}
+
+
+export function useStandards() {
+  return useQuery({
+    queryKey: queryKeys.standards,
+    queryFn: () => browserRequest<Standard[]>('/api/standards'),
+  });
+}
+
+export function useStandardVersions(standardId: string) {
+  return useQuery({
+    queryKey: queryKeys.standardVersions(standardId),
+    queryFn: () =>
+      browserRequest<StandardVersion[]>(
+        `/api/standards/${standardId}/versions`,
+      ),
+    enabled: Boolean(standardId),
+  });
+}
+
+export function useProjectStandards(projectId: string) {
+  return useQuery({
+    queryKey: queryKeys.projectStandards(projectId),
+    queryFn: () =>
+      browserRequest<ProjectStandardAttachment[]>(
+        `/api/projects/${projectId}/standards`,
+      ),
+    enabled: Boolean(projectId),
+  });
+}
+
+export function useAttachStandard(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (versionId: string) =>
+      browserRequest<{id: string}>(
+        `/api/projects/${projectId}/standards/${versionId}`,
+        {method: 'POST'},
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.projectStandards(projectId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.disclosures(projectId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.requirements(projectId),
+      });
+    },
+  });
+}
+
+export function useProjectDisclosures(projectId: string) {
+  return useQuery({
+    queryKey: queryKeys.disclosures(projectId),
+    queryFn: () =>
+      browserRequest<ProjectDisclosure[]>(
+        `/api/projects/${projectId}/disclosures`,
+      ),
+    enabled: Boolean(projectId),
+  });
+}
+
+export function useProjectDisclosure(
+  projectId: string,
+  projectDisclosureId: string,
+) {
+  return useQuery({
+    queryKey: queryKeys.disclosure(projectId, projectDisclosureId),
+    queryFn: () =>
+      browserRequest<ProjectDisclosureDetail>(
+        `/api/projects/${projectId}/disclosures/${projectDisclosureId}`,
+      ),
+    enabled: Boolean(projectId && projectDisclosureId),
+  });
+}
+
+export function useProjectRequirements(projectId: string) {
+  return useQuery({
+    queryKey: queryKeys.requirements(projectId),
+    queryFn: () =>
+      browserRequest<ProjectRequirement[]>(
+        `/api/projects/${projectId}/requirements`,
+      ),
+    enabled: Boolean(projectId),
+  });
+}
+
+export function useRunDisclosureMapping(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      browserRequest<{status: string; mappings_created: number}>(
+        `/api/projects/${projectId}/gri/disclosure-mapping`,
+        {method: 'POST'},
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.disclosures(projectId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.requirements(projectId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['projects', projectId, 'disclosures'],
+      });
+    },
+  });
+}
+
+export function useUpdateProjectDisclosure(
+  projectId: string,
+  projectDisclosureId: string,
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ProjectDisclosureUpdateInput) =>
+      browserRequest<ProjectDisclosure>(
+        `/api/projects/${projectId}/disclosures/${projectDisclosureId}`,
+        {method: 'PATCH', body: JSON.stringify(input)},
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.disclosures(projectId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.disclosure(projectId, projectDisclosureId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.requirements(projectId),
+      });
+    },
+  });
+}
+
+export function useMissingItems(projectId: string) {
+  return useQuery({
+    queryKey: queryKeys.missingItems(projectId),
+    queryFn: () =>
+      browserRequest<MissingItem[]>(
+        `/api/projects/${projectId}/missing-items`,
+      ),
+    enabled: Boolean(projectId),
+  });
+}
+
+export function useRunMissingAnalysis(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      browserRequest<{status: string; missing_items_created: number}>(
+        `/api/projects/${projectId}/missing-analysis`,
+        {method: 'POST'},
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.missingItems(projectId),
+      });
+    },
+  });
+}
+
+export function useUpdateMissingItem(projectId: string, itemId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: MissingItemUpdateInput) =>
+      browserRequest<MissingItem>(`/api/missing-items/${itemId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.missingItems(projectId),
+      });
     },
   });
 }

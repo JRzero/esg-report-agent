@@ -116,3 +116,22 @@ CONFIRMED / REJECTED
 ```
 
 Fact Evidence deep-links to the exact immutable DocumentVersion + DocumentAnchor, and conflict winners can only be selected through the explicit conflict-group resolution contract.
+
+
+## GRI Disclosure & Missing Data Workspace
+
+Requirement-level ESG coverage is now operational:
+
+```text
+Confirmed Fact
+  ↓
+Disclosure Mapping
+  ↓
+Requirement Coverage
+  ↓
+Missing Data Analysis
+  ↓
+Missing Item workflow
+```
+
+NOT_APPLICABLE is an explicit project decision. Missing Item operational state remains separate from Requirement coverage.

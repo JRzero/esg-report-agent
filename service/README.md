@@ -180,3 +180,27 @@ POST /api/v1/fact-conflicts/{group_id}/resolve
 ```
 
 A Fact in `CONFLICT` cannot use the ordinary confirm/reject path. The conflict group must be explicitly resolved by selecting one member Fact.
+
+
+## GRI coverage
+
+Project GRI endpoints now include:
+
+```text
+GET   /api/v1/projects/{project_id}/standards
+POST  /api/v1/projects/{project_id}/standards/{version_id}
+
+GET   /api/v1/projects/{project_id}/disclosures
+GET   /api/v1/projects/{project_id}/disclosures/{project_disclosure_id}
+PATCH /api/v1/projects/{project_id}/disclosures/{project_disclosure_id}
+
+GET   /api/v1/projects/{project_id}/requirements
+POST  /api/v1/projects/{project_id}/ai/disclosure-mapping
+
+GET   /api/v1/projects/{project_id}/missing-items
+PATCH /api/v1/missing-items/{item_id}
+POST  /api/v1/projects/{project_id}/ai/missing-data-analysis
+```
+
+RULE Fact Mapping is rebuilt from current CONFIRMED Facts. Stale mappings are removed on remap.
+NOT_APPLICABLE is an explicit project decision and is not inferred by AI.
