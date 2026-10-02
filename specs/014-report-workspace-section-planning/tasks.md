@@ -1,0 +1,24 @@
+# Tasks
+
+- [ ] Extend SectionPlan schema
+- [ ] Add planning-context builder
+- [ ] Add Section detail endpoint
+- [ ] Add Section Disclosure list/remove endpoints
+- [ ] Enforce Project Disclosure mapping boundary
+- [ ] Invalidate plan when disclosure mappings change
+- [ ] Add Writing Plan update/confirm endpoint
+- [ ] Require confirmed plan for writing
+- [ ] Add Service regression tests
+- [ ] Add Report/Section BFF routes
+- [ ] Add frontend Report/Section contracts
+- [ ] Add Report list/create UI
+- [ ] Add Report Workspace
+- [ ] Add Section Tree/create/edit
+- [ ] Add Disclosure Mapping UI
+- [ ] Add Planning Context UI
+- [ ] Add AI Planning task UI
+- [ ] Add Writing Plan editor/confirm UI
+- [ ] Add frontend tests
+- [ ] Run Web CI
+- [ ] Run Service CI
+- [ ] Publish acceptance report
