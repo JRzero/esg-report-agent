@@ -74,3 +74,26 @@ Next.js HttpOnly BFF session
 
 Project-scoped navigation is now stable for Materials, Facts, Reports, GRI, Missing Data and Members.
 Those later modules remain explicit placeholders until their own specs are implemented.
+
+
+## Material Center & Evidence Viewer
+
+The project Materials route is now a real evidence workflow:
+
+```text
+Project
+  ↓
+Material upload
+  ↓
+Immutable DocumentVersion
+  ↓
+Service parser
+  ↓
+DocumentAnchor
+  ↓
+Evidence Viewer
+  ↓
+Fact Extraction task
+```
+
+Reference and Standard sources remain separated from enterprise Evidence in both UI and action availability.
