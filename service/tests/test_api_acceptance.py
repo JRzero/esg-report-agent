@@ -434,3 +434,96 @@ async def test_task_cancel_and_retry(client):
     )
     assert same.status_code == 202
     assert same.json()["task_id"] == task_id
+
+
+@pytest.mark.asyncio
+async def test_fact_evidence_trace_and_revision_history(client):
+    await seed_tenant()
+    headers = await login(client, "admin@example.com")
+    _, project_id = await create_company_project(client, headers)
+
+    upload = await client.post(
+        f"/api/v1/projects/{project_id}/documents",
+        headers=headers,
+        data={"source_type": "EVIDENCE", "category_code": "employees"},
+        files={
+            "file": (
+                "employees.xlsx",
+                make_xlsx(1287),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
+    )
+    assert upload.status_code == 201, upload.text
+    version_id = upload.json()["version_id"]
+    await _process_document(version_id)
+
+    anchors = await client.get(
+        f"/api/v1/document-versions/{version_id}/anchors",
+        headers=headers,
+    )
+    b1 = next(item for item in anchors.json() if item["cell_range"] == "B1")
+
+    created = await client.post(
+        f"/api/v1/projects/{project_id}/facts",
+        headers=headers,
+        json={
+            "fact_type": "METRIC",
+            "metric_code": "EMPLOYEE_TOTAL",
+            "name": "Employee total",
+            "value_type": "NUMBER",
+            "number_value": 1287,
+            "raw_value": "1287",
+            "unit": "person",
+            "period_start": "2026-01-01",
+            "period_end": "2026-12-31",
+            "entity_scope": "GROUP",
+            "anchor_ids": [b1["id"]],
+            "source_type": "AI",
+        },
+    )
+    assert created.status_code == 201, created.text
+    fact_id = created.json()["id"]
+
+    edited = await client.patch(
+        f"/api/v1/facts/{fact_id}",
+        headers=headers,
+        json={"unit": "people"},
+    )
+    assert edited.status_code == 200, edited.text
+
+    confirmed = await client.post(
+        f"/api/v1/facts/{fact_id}/confirm",
+        headers=headers,
+    )
+    assert confirmed.status_code == 200, confirmed.text
+
+    evidence = await client.get(
+        f"/api/v1/facts/{fact_id}/evidence",
+        headers=headers,
+    )
+    assert evidence.status_code == 200, evidence.text
+    trace = evidence.json()[0]
+    assert trace["document"]["source_type"] == "EVIDENCE"
+    assert trace["document"]["version_id"] == version_id
+    assert trace["document"]["version_no"] == 1
+    assert len(trace["document"]["sha256"]) == 64
+    assert trace["anchor"]["type"] == "EXCEL_CELL"
+    assert trace["anchor"]["sheet_name"] == "员工统计"
+    assert trace["anchor"]["cell_range"] == "B1"
+    assert trace["anchor"]["raw_text"] == "1287"
+    assert trace["anchor"]["content_hash"]
+
+    revisions = await client.get(
+        f"/api/v1/facts/{fact_id}/revisions",
+        headers=headers,
+    )
+    assert revisions.status_code == 200, revisions.text
+    history = revisions.json()
+    assert [item["change_type"] for item in history[:3]] == [
+        "CONFIRMED",
+        "HUMAN_EDIT",
+        "AI_CREATED",
+    ]
+    assert [item["revision_no"] for item in history[:3]] == [3, 2, 1]
+    assert history[0]["snapshot"]["status"] == "CONFIRMED"
