@@ -210,8 +210,19 @@ class FactRead(FactCreate, ORMModel):
     confirmed_at: datetime | None = None
 
 
+class ProjectDisclosureUpdate(BaseModel):
+    applicability: Literal["APPLICABLE", "NOT_APPLICABLE", "UNDETERMINED"] | None = None
+    notes: str | None = Field(default=None, max_length=4000)
+
+
 class MissingItemUpdate(BaseModel):
-    status: Literal["MISSING", "REQUESTED", "RECEIVED", "NOT_APPLICABLE"] | None = None
+    status: Literal[
+        "MISSING",
+        "REQUESTED",
+        "RECEIVED",
+        "RESOLVED",
+        "NOT_APPLICABLE",
+    ] | None = None
     priority: Literal["LOW", "MEDIUM", "HIGH"] | None = None
     suggested_material: str | None = None
 
