@@ -147,3 +147,17 @@ Decision rules:
 - REJECTED → retained for audit
 
 Evidence links deep-link back to the exact Material DocumentVersion and DocumentAnchor.
+
+
+## GRI & Missing Data
+
+Implemented:
+
+```text
+/projects/{projectId}/gri
+/projects/{projectId}/gri/{projectDisclosureId}
+/projects/{projectId}/missing
+```
+
+GRI coverage is requirement-level and is recomputed from CONFIRMED Facts. Project users can explicitly
+set Disclosure applicability. Missing Items track evidence/data follow-up separately from coverage.
