@@ -160,3 +160,23 @@ uv run python scripts/run_esg_scenario_evals.py --live --live-limit 3
 ```
 
 See `../docs/esg-golden-dataset-eval-report.md`.
+
+
+## Fact trace
+
+Fact review APIs expose:
+
+```text
+GET  /api/v1/facts/{fact_id}
+PATCH /api/v1/facts/{fact_id}
+POST /api/v1/facts/{fact_id}/confirm
+POST /api/v1/facts/{fact_id}/reject
+GET  /api/v1/facts/{fact_id}/evidence
+GET  /api/v1/facts/{fact_id}/revisions
+
+GET  /api/v1/projects/{project_id}/fact-conflicts
+GET  /api/v1/fact-conflicts/{group_id}
+POST /api/v1/fact-conflicts/{group_id}/resolve
+```
+
+A Fact in `CONFLICT` cannot use the ordinary confirm/reject path. The conflict group must be explicitly resolved by selecting one member Fact.
