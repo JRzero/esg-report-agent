@@ -1,0 +1,22 @@
+# Tasks
+
+- [ ] Add project Standards read endpoint
+- [ ] Add Disclosure detail read endpoint
+- [ ] Enrich project Disclosure/Requirement read models
+- [ ] Add Disclosure applicability update
+- [ ] Add RESOLVED Missing Item state
+- [ ] Add Service regression tests
+- [ ] Add GRI BFF routes
+- [ ] Add GRI frontend types/query hooks
+- [ ] Add Standard attach UI
+- [ ] Add GRI coverage dashboard
+- [ ] Add Disclosure detail
+- [ ] Add mapped Fact display
+- [ ] Add Fact Mapping action
+- [ ] Add Missing Data Analysis action
+- [ ] Add Missing Data workspace
+- [ ] Add Missing Item workflow
+- [ ] Add frontend tests
+- [ ] Run Web CI
+- [ ] Run Service CI
+- [ ] Publish acceptance report
