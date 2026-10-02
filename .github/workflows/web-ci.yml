@@ -7,6 +7,7 @@ on:
       - "web/**"
       - "specs/009-frontend-foundation-astryx/**"
       - "specs/010-authentication-project-workspace/**"
+      - "specs/011-material-center-evidence-viewer/**"
       - ".github/workflows/web-ci.yml"
   pull_request:
     paths:
@@ -44,6 +45,11 @@ jobs:
 
       - name: Astryx component contract
         run: npm run astryx -- component Button --json > /tmp/astryx-button.json
+
+      - name: Astryx material contracts
+        run: |
+          npm run astryx -- component FileInput --json > /tmp/astryx-file-input.json
+          npm run astryx -- component Selector --json > /tmp/astryx-selector.json
 
       - name: Lint
         run: npm run lint
