@@ -204,3 +204,22 @@ POST  /api/v1/projects/{project_id}/ai/missing-data-analysis
 
 RULE Fact Mapping is rebuilt from current CONFIRMED Facts. Stale mappings are removed on remap.
 NOT_APPLICABLE is an explicit project decision and is not inferred by AI.
+
+
+## Section planning
+
+Report planning endpoints include:
+
+```text
+GET   /api/v1/sections/{section_id}
+GET   /api/v1/sections/{section_id}/disclosures
+POST  /api/v1/sections/{section_id}/disclosures/{disclosure_id}
+DELETE /api/v1/sections/{section_id}/disclosures/{disclosure_id}
+GET   /api/v1/sections/{section_id}/planning-context
+PUT   /api/v1/sections/{section_id}/writing-plan
+POST  /api/v1/sections/{section_id}/ai/writing-plan
+```
+
+The planning context is scoped through Project Disclosure mappings and current CONFIRMED Facts.
+AI plans are DRAFT by default; Section Writing requires an explicitly CONFIRMED plan and is limited
+to the plan's selected Fact IDs.

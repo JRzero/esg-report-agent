@@ -9,7 +9,7 @@ from app.core.config import get_settings
 from app.core.database import SessionLocal
 from app.integrations.parsers import parse_document
 from app.integrations.storage import storage
-from app.modules.models import AITask, ContextBinding, Document, DocumentAnchor, DocumentVersion
+from app.modules.models import AITask, ContextBinding, Document, DocumentAnchor, DocumentVersion, ReportSection
 from app.modules.services import TaskService
 from app.workers.celery_app import celery_app
 
@@ -239,6 +239,15 @@ async def _run_ai_task(task_id: str):
         except Exception as exc:
             await session.rollback()
             async with session.begin():
+                failed_task = await session.get(AITask, task_id)
+                if (
+                    failed_task
+                    and failed_task.task_type == "SECTION_PLANNING"
+                    and failed_task.target_id
+                ):
+                    section = await session.get(ReportSection, failed_task.target_id)
+                    if section and section.project_id == failed_task.project_id:
+                        section.status = "DRAFT" if section.writing_plan else "NOT_STARTED"
                 await session.execute(
                     update(AITask)
                     .where(AITask.id == task_id, AITask.status == "RUNNING")

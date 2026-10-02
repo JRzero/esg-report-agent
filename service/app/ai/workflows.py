@@ -1,4 +1,5 @@
 from sqlalchemy import func, select
+from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.llm import LLMGateway
@@ -87,54 +88,74 @@ class SectionPlanningWorkflow:
         self.llm = llm or LLMGateway()
 
     async def run(self, project_id, section_id):
-        section = await self.s.get(ReportSection, section_id)
-        if not section or section.project_id != project_id:
-            raise NotFound("SECTION_NOT_FOUND", "Section not found")
-        facts = list(
-            (
-                await self.s.scalars(
-                    select(Fact)
-                    .where(
-                        Fact.project_id == project_id,
-                        Fact.status == "CONFIRMED",
-                        Fact.deleted_at.is_(None),
-                    )
-                    .order_by(Fact.created_at)
-                )
-            ).all()
+        service = ReportService(self.s)
+        context = await service.section_planning_context(project_id, section_id)
+
+        prompt_lines = [
+            f"Section: {context['section']['title']}",
+            f"Description: {context['section']['description'] or ''}",
+            "",
+            "Mapped disclosures:",
+        ]
+        prompt_lines.extend(
+            f"- {item['id']} {item['code']} {item['title']} "
+            f"applicability={item['applicability']} coverage={item['coverage_status']}"
+            for item in context["disclosures"]
         )
-        prompt = (
-            f"Section: {section.title}\n"
-            f"Description: {section.description or ''}\n"
-            "Confirmed facts:\n"
-            + "\n".join(
-                f"{fact.id}: {fact.name}="
-                f"{fact.number_value if fact.number_value is not None else fact.text_value} "
-                f"{fact.unit or ''}"
-                for fact in facts
-            )
+        prompt_lines.append("")
+        prompt_lines.append("Requirements:")
+        prompt_lines.extend(
+            f"- {item['id']} {item['disclosure_code']} {item['code']} "
+            f"status={item['status']}: {item['content']}"
+            for item in context["requirements"]
         )
+        prompt_lines.append("")
+        prompt_lines.append("Confirmed facts:")
+        prompt_lines.extend(
+            f"- {item['id']} {item['name']}="
+            f"{item['number_value'] if item['number_value'] is not None else item['text_value']} "
+            f"{item['unit'] or ''} period={item['period_start']}:{item['period_end']} "
+            f"scope={item['entity_scope'] or ''}"
+            for item in context["facts"]
+        )
+        prompt_lines.append("")
+        prompt_lines.append("Evidence anchors:")
+        prompt_lines.extend(
+            f"- {item['anchor_id']} fact={item['fact_id']} "
+            f"{item['document_name']} "
+            f"{item['sheet_name'] or ''} {item['cell_range'] or ''} "
+            f"page={item['page_start'] or ''}: {item['raw_text'][:500]}"
+            for item in context["evidence"][:100]
+        )
+        prompt_lines.append("")
+        prompt_lines.append("Missing items:")
+        prompt_lines.extend(
+            f"- {item['id']} status={item['status']} priority={item['priority']}: "
+            f"{item['name']} {item['description'] or ''}"
+            for item in context["missing_items"]
+        )
+        if context["warnings"]:
+            prompt_lines.append("")
+            prompt_lines.append("Context warnings:")
+            prompt_lines.extend(f"- {warning}" for warning in context["warnings"])
+
         plan = await self.llm.generate_structured(
-            "Create an ESG section writing plan. Do not invent facts. "
+            "Create an ESG section writing plan using only the supplied scoped context. "
+            "Do not invent facts or resource IDs. "
+            "Use disclosure_ids, requirement_ids, fact_ids, evidence_anchor_ids and "
+            "missing_item_ids only when they appear in the supplied context. "
             "Explicitly identify missing evidence instead of filling gaps.",
-            prompt,
+            "\n".join(prompt_lines),
             SectionPlan,
             "REASONING",
         )
-        allowed_fact_ids = {fact.id for fact in facts}
-        unknown_plan_facts = set(plan.fact_ids) - allowed_fact_ids
-        if unknown_plan_facts:
-            raise Conflict(
-                "AI_OUTPUT_UNGROUNDED",
-                "Writing plan referenced Facts outside the confirmed project Fact context",
-            )
-        current = section.writing_plan or {}
-        section.writing_plan = {
-            "version": int(current.get("version", 0)) + 1,
-            **plan.model_dump(mode="json"),
-        }
-        section.status = "DRAFT"
-        return section.writing_plan
+        return await service.save_section_writing_plan(
+            project_id,
+            section_id,
+            plan,
+            source="AI",
+            status="DRAFT",
+        )
 
 
 class SectionWritingWorkflow:
@@ -148,23 +169,39 @@ class SectionWritingWorkflow:
             raise NotFound("SECTION_NOT_FOUND", "Section not found")
         if not section.writing_plan:
             raise Conflict("WRITING_PLAN_REQUIRED", "Generate and confirm a writing plan first")
-        facts = list(
-            (
-                await self.s.scalars(
-                    select(Fact)
-                    .where(
-                        Fact.project_id == project_id,
-                        Fact.status == "CONFIRMED",
-                        Fact.deleted_at.is_(None),
+        if section.writing_plan.get("status") != "CONFIRMED":
+            raise Conflict(
+                "WRITING_PLAN_NOT_CONFIRMED",
+                "Section writing requires a human-confirmed writing plan",
+            )
+        planned_fact_ids = {
+            UUID(str(value)) for value in section.writing_plan.get("fact_ids", [])
+        }
+        facts = []
+        if planned_fact_ids:
+            facts = list(
+                (
+                    await self.s.scalars(
+                        select(Fact)
+                        .where(
+                            Fact.project_id == project_id,
+                            Fact.id.in_(planned_fact_ids),
+                            Fact.status == "CONFIRMED",
+                            Fact.deleted_at.is_(None),
+                        )
+                        .order_by(Fact.created_at)
                     )
-                    .order_by(Fact.created_at)
+                ).all()
+            )
+            if {fact.id for fact in facts} != planned_fact_ids:
+                raise Conflict(
+                    "WRITING_PLAN_CONTEXT_STALE",
+                    "One or more planned Facts are no longer confirmed and available",
                 )
-            ).all()
-        )
         prompt = (
             f"Section: {section.title}\n"
             f"Plan: {section.writing_plan}\n"
-            "Confirmed facts:\n"
+            "Confirmed facts allowed by the plan:\n"
             + "\n".join(
                 f"{fact.id}: {fact.name}="
                 f"{fact.number_value if fact.number_value is not None else fact.text_value} "

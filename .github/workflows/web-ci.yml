@@ -10,6 +10,7 @@ on:
       - "specs/011-material-center-evidence-viewer/**"
       - "specs/012-fact-center-evidence-trace/**"
       - "specs/013-gri-missing-data-workspace/**"
+      - "specs/014-report-workspace-section-planning/**"
       - ".github/workflows/web-ci.yml"
   pull_request:
     paths:

@@ -276,6 +276,20 @@ class SectionUpdate(BaseModel):
     status: Literal["NOT_STARTED", "GENERATING", "DRAFT", "COMPLETED"] | None = None
 
 
+class SectionWritingPlanUpdate(BaseModel):
+    goal: str = Field(min_length=1, max_length=2000)
+    recommended_structure: list[str] = Field(default_factory=list)
+    key_messages: list[str] = Field(default_factory=list)
+    disclosure_ids: list[UUID] = Field(default_factory=list)
+    requirement_ids: list[UUID] = Field(default_factory=list)
+    fact_ids: list[UUID] = Field(default_factory=list)
+    evidence_anchor_ids: list[UUID] = Field(default_factory=list)
+    missing_item_ids: list[UUID] = Field(default_factory=list)
+    missing_items: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    status: Literal["DRAFT", "CONFIRMED"] = "DRAFT"
+
+
 class SectionRead(SectionCreate, ORMModel):
     id: UUID
     report_id: UUID
@@ -299,13 +313,18 @@ class BlockUpdate(BaseModel):
 
 class TaskRead(ORMModel):
     id: UUID
+    project_id: UUID | None = None
     task_type: str
+    target_type: str | None = None
+    target_id: UUID | None = None
     status: str
     progress: Decimal
     stage: str | None = None
     result_json: dict
     error_code: str | None = None
     error_message: str | None = None
+    created_at: datetime
+    completed_at: datetime | None = None
 
 
 class ClaimVerifyResponse(BaseModel):

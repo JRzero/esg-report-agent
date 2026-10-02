@@ -1218,6 +1218,253 @@ class ReportService:
                 mapping[template_section.id] = section.id
         return report
 
+    async def section_planning_context(self, project_id: UUID, section_id: UUID):
+        section = await self.s.get(ReportSection, section_id)
+        if not section or section.project_id != project_id:
+            raise NotFound("SECTION_NOT_FOUND", "Section not found")
+
+        disclosure_rows = (
+            await self.s.execute(
+                select(SectionDisclosureMap, Disclosure, ProjectDisclosure)
+                .join(Disclosure, SectionDisclosureMap.disclosure_id == Disclosure.id)
+                .join(
+                    ProjectDisclosure,
+                    (ProjectDisclosure.disclosure_id == Disclosure.id)
+                    & (ProjectDisclosure.project_id == project_id),
+                )
+                .where(SectionDisclosureMap.section_id == section_id)
+                .order_by(Disclosure.sort_order, Disclosure.code)
+            )
+        ).all()
+        disclosure_ids = [disclosure.id for _, disclosure, _ in disclosure_rows]
+
+        requirements = []
+        if disclosure_ids:
+            requirement_rows = (
+                await self.s.execute(
+                    select(ProjectRequirementStatus, DisclosureRequirement, Disclosure)
+                    .join(
+                        DisclosureRequirement,
+                        ProjectRequirementStatus.requirement_id == DisclosureRequirement.id,
+                    )
+                    .join(Disclosure, DisclosureRequirement.disclosure_id == Disclosure.id)
+                    .where(
+                        ProjectRequirementStatus.project_id == project_id,
+                        DisclosureRequirement.disclosure_id.in_(disclosure_ids),
+                        ProjectRequirementStatus.status != "NOT_APPLICABLE",
+                    )
+                    .order_by(Disclosure.sort_order, DisclosureRequirement.sort_order)
+                )
+            ).all()
+            requirements = [
+                {
+                    "id": requirement.id,
+                    "disclosure_id": disclosure.id,
+                    "disclosure_code": disclosure.code,
+                    "code": requirement.requirement_code,
+                    "content": requirement.content,
+                    "status": status.status,
+                    "reason": status.reason,
+                    "required_data_json": requirement.required_data_json,
+                }
+                for status, requirement, disclosure in requirement_rows
+            ]
+
+        if disclosure_ids:
+            fact_rows = (
+                await self.s.execute(
+                    select(DisclosureFactMap, Fact)
+                    .join(Fact, DisclosureFactMap.fact_id == Fact.id)
+                    .where(
+                        DisclosureFactMap.project_id == project_id,
+                        DisclosureFactMap.disclosure_id.in_(disclosure_ids),
+                        Fact.status == "CONFIRMED",
+                        Fact.deleted_at.is_(None),
+                    )
+                    .order_by(Fact.created_at)
+                )
+            ).all()
+            facts_by_id = {fact.id: fact for _, fact in fact_rows}
+        else:
+            facts = list(
+                (
+                    await self.s.scalars(
+                        select(Fact)
+                        .where(
+                            Fact.project_id == project_id,
+                            Fact.status == "CONFIRMED",
+                            Fact.deleted_at.is_(None),
+                        )
+                        .order_by(Fact.created_at)
+                    )
+                ).all()
+            )
+            facts_by_id = {fact.id: fact for fact in facts}
+
+        fact_ids = list(facts_by_id)
+        evidence = []
+        if fact_ids:
+            evidence_rows = (
+                await self.s.execute(
+                    select(FactEvidence, DocumentAnchor, DocumentVersion, Document)
+                    .join(
+                        DocumentAnchor,
+                        FactEvidence.document_anchor_id == DocumentAnchor.id,
+                    )
+                    .join(
+                        DocumentVersion,
+                        DocumentAnchor.document_version_id == DocumentVersion.id,
+                    )
+                    .join(Document, DocumentVersion.document_id == Document.id)
+                    .where(
+                        FactEvidence.fact_id.in_(fact_ids),
+                        Document.project_id == project_id,
+                        Document.source_type.in_(["EVIDENCE", "HISTORICAL"]),
+                    )
+                    .order_by(FactEvidence.fact_id, FactEvidence.id)
+                )
+            ).all()
+            evidence = [
+                {
+                    "fact_id": fact_evidence.fact_id,
+                    "fact_evidence_id": fact_evidence.id,
+                    "evidence_role": fact_evidence.evidence_role,
+                    "anchor_id": anchor.id,
+                    "anchor_type": anchor.anchor_type,
+                    "page_start": anchor.page_start,
+                    "page_end": anchor.page_end,
+                    "sheet_name": anchor.sheet_name,
+                    "cell_range": anchor.cell_range,
+                    "heading_path": anchor.heading_path,
+                    "paragraph_start": anchor.paragraph_start,
+                    "paragraph_end": anchor.paragraph_end,
+                    "slide_number": anchor.slide_number,
+                    "raw_text": anchor.raw_text,
+                    "document_id": document.id,
+                    "document_name": document.name,
+                    "document_version_id": version.id,
+                    "document_version_no": version.version_no,
+                }
+                for fact_evidence, anchor, version, document in evidence_rows
+            ]
+
+        missing_items = []
+        if disclosure_ids:
+            missing_items = list(
+                (
+                    await self.s.scalars(
+                        select(MissingItem)
+                        .where(
+                            MissingItem.project_id == project_id,
+                            MissingItem.disclosure_id.in_(disclosure_ids),
+                            MissingItem.status.in_(["MISSING", "REQUESTED", "RECEIVED"]),
+                        )
+                        .order_by(MissingItem.priority.desc(), MissingItem.created_at)
+                    )
+                ).all()
+            )
+
+        return {
+            "section": {
+                "id": section.id,
+                "title": section.title,
+                "description": section.description,
+            },
+            "disclosures": [
+                {
+                    "mapping_id": mapping.id,
+                    "id": disclosure.id,
+                    "code": disclosure.code,
+                    "title": disclosure.title,
+                    "applicability": project_disclosure.applicability,
+                    "coverage_status": project_disclosure.coverage_status,
+                }
+                for mapping, disclosure, project_disclosure in disclosure_rows
+            ],
+            "requirements": requirements,
+            "facts": [
+                {
+                    "id": fact.id,
+                    "name": fact.name,
+                    "value_type": fact.value_type,
+                    "number_value": fact.number_value,
+                    "text_value": fact.text_value,
+                    "boolean_value": fact.boolean_value,
+                    "date_value": fact.date_value,
+                    "json_value": fact.json_value,
+                    "raw_value": fact.raw_value,
+                    "unit": fact.unit,
+                    "period_start": fact.period_start,
+                    "period_end": fact.period_end,
+                    "entity_scope": fact.entity_scope,
+                    "semantic_key": fact.semantic_key,
+                }
+                for fact in facts_by_id.values()
+            ],
+            "evidence": evidence,
+            "missing_items": [
+                {
+                    "id": item.id,
+                    "disclosure_id": item.disclosure_id,
+                    "requirement_id": item.requirement_id,
+                    "name": item.name,
+                    "description": item.description,
+                    "missing_type": item.missing_type,
+                    "priority": item.priority,
+                    "status": item.status,
+                    "suggested_material": item.suggested_material,
+                }
+                for item in missing_items
+            ],
+            "warnings": (
+                ["Section has no mapped Disclosure; planning uses all project CONFIRMED Facts."]
+                if not disclosure_ids
+                else []
+            ),
+        }
+
+    async def save_section_writing_plan(
+        self,
+        project_id: UUID,
+        section_id: UUID,
+        data,
+        *,
+        source: str,
+        status: str,
+    ):
+        section = await self.s.get(ReportSection, section_id)
+        if not section or section.project_id != project_id:
+            raise NotFound("SECTION_NOT_FOUND", "Section not found")
+        context = await self.section_planning_context(project_id, section_id)
+
+        allowed = {
+            "disclosure_ids": {item["id"] for item in context["disclosures"]},
+            "requirement_ids": {item["id"] for item in context["requirements"]},
+            "fact_ids": {item["id"] for item in context["facts"]},
+            "evidence_anchor_ids": {item["anchor_id"] for item in context["evidence"]},
+            "missing_item_ids": {item["id"] for item in context["missing_items"]},
+        }
+
+        payload = data.model_dump(mode="json") if hasattr(data, "model_dump") else dict(data)
+        for key, allowed_ids in allowed.items():
+            values = payload.get(key, [])
+            unknown = {UUID(str(value)) for value in values} - allowed_ids
+            if unknown:
+                raise Conflict(
+                    "WRITING_PLAN_CONTEXT_STALE",
+                    f"Writing plan references {key} outside current section context",
+                )
+
+        current = section.writing_plan or {}
+        section.writing_plan = {
+            "version": int(current.get("version", 0)) + 1,
+            "source": source,
+            "status": status,
+            **payload,
+        }
+        section.status = "DRAFT"
+        return section.writing_plan
+
     async def blocks(self, section_id):
         return list(
             (
