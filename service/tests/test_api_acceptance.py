@@ -10,6 +10,7 @@ from sqlalchemy import select
 from app.ai.schemas import ClaimDraft, DraftBlock, SectionDraft, SectionPlan
 from app.ai.workflows import SectionPlanningWorkflow, SectionWritingWorkflow
 from app.core.database import SessionLocal
+from app.core.errors import Conflict
 from app.modules.models import (
     Claim,
     Disclosure,
@@ -858,3 +859,275 @@ async def test_gri_workspace_applicability_mapping_and_missing_workflow(client):
     assert {
         item["status"] for item in stale_free_detail.json()["requirements"]
     } == {"MISSING"}
+
+
+@pytest.mark.asyncio
+async def test_report_section_planning_context_is_scoped_and_invalidated(client):
+    await seed_tenant()
+    headers = await login(client, "admin@example.com")
+    _, project_id = await create_company_project(client, headers)
+
+    standards = await client.get("/api/v1/standards", headers=headers)
+    gri = next(item for item in standards.json() if item["code"] == "GRI")
+    versions = await client.get(
+        f"/api/v1/standards/{gri['id']}/versions",
+        headers=headers,
+    )
+    gri_2021 = next(item for item in versions.json() if item["version_code"] == "2021")
+    disclosures = await client.get(
+        f"/api/v1/standard-versions/{gri_2021['id']}/disclosures",
+        headers=headers,
+    )
+    employees_disclosure = next(
+        item for item in disclosures.json() if item["code"] == "GRI 2-7"
+    )
+
+    report = await client.post(
+        f"/api/v1/projects/{project_id}/reports",
+        headers=headers,
+        json={"title": "2026 ESG Report", "language": "zh-CN"},
+    )
+    assert report.status_code == 201, report.text
+    report_id = report.json()["id"]
+    section = await client.post(
+        f"/api/v1/reports/{report_id}/sections",
+        headers=headers,
+        json={
+            "title": "员工与发展",
+            "description": "披露员工规模与结构。",
+            "level": 1,
+            "sort_order": 1,
+        },
+    )
+    assert section.status_code == 201, section.text
+    section_id = section.json()["id"]
+
+    unattached = await client.post(
+        f"/api/v1/sections/{section_id}/disclosures/{employees_disclosure['id']}",
+        headers=headers,
+    )
+    assert unattached.status_code == 409, unattached.text
+    assert unattached.json()["error"]["code"] == "DISCLOSURE_NOT_ATTACHED_TO_PROJECT"
+
+    attached = await client.post(
+        f"/api/v1/projects/{project_id}/standards/{gri_2021['id']}",
+        headers=headers,
+    )
+    assert attached.status_code == 201, attached.text
+
+    upload = await client.post(
+        f"/api/v1/projects/{project_id}/documents",
+        headers=headers,
+        data={"source_type": "EVIDENCE", "category_code": "employees"},
+        files={
+            "file": (
+                "employees.xlsx",
+                make_xlsx(1287),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
+    )
+    assert upload.status_code == 201, upload.text
+    version_id = upload.json()["version_id"]
+    await _process_document(version_id)
+    anchors = await client.get(
+        f"/api/v1/document-versions/{version_id}/anchors",
+        headers=headers,
+    )
+    employee_anchor = next(item for item in anchors.json() if item["cell_range"] == "B1")
+
+    async with SessionLocal() as session:
+        employee_metric = await session.scalar(
+            select(MetricDefinition).where(MetricDefinition.code == "EMPLOYEE_TOTAL")
+        )
+        scope1_metric = await session.scalar(
+            select(MetricDefinition).where(MetricDefinition.code == "GHG_SCOPE1")
+        )
+        assert employee_metric and scope1_metric
+        employee_metric_id = str(employee_metric.id)
+        scope1_metric_id = str(scope1_metric.id)
+
+    employee_fact = await client.post(
+        f"/api/v1/projects/{project_id}/facts",
+        headers=headers,
+        json={
+            "fact_type": "METRIC",
+            "metric_definition_id": employee_metric_id,
+            "metric_code": "EMPLOYEE_TOTAL",
+            "name": "员工总人数",
+            "value_type": "NUMBER",
+            "number_value": 1287,
+            "raw_value": "1287",
+            "unit": "person",
+            "period_start": "2026-01-01",
+            "period_end": "2026-12-31",
+            "entity_scope": "GROUP",
+            "anchor_ids": [employee_anchor["id"]],
+            "source_type": "AI",
+        },
+    )
+    assert employee_fact.status_code == 201, employee_fact.text
+    employee_fact_id = employee_fact.json()["id"]
+    assert (
+        await client.post(f"/api/v1/facts/{employee_fact_id}/confirm", headers=headers)
+    ).status_code == 200
+
+    unrelated_fact = await client.post(
+        f"/api/v1/projects/{project_id}/facts",
+        headers=headers,
+        json={
+            "fact_type": "METRIC",
+            "metric_definition_id": scope1_metric_id,
+            "metric_code": "GHG_SCOPE1",
+            "name": "Scope 1 emissions",
+            "value_type": "NUMBER",
+            "number_value": 1200,
+            "unit": "tCO2e",
+            "period_start": "2026-01-01",
+            "period_end": "2026-12-31",
+            "entity_scope": "GROUP",
+            "source_type": "HUMAN",
+        },
+    )
+    assert unrelated_fact.status_code == 201, unrelated_fact.text
+    unrelated_fact_id = unrelated_fact.json()["id"]
+    assert (
+        await client.post(f"/api/v1/facts/{unrelated_fact_id}/confirm", headers=headers)
+    ).status_code == 200
+
+    mapped = await client.post(
+        f"/api/v1/projects/{project_id}/ai/disclosure-mapping",
+        headers=headers,
+    )
+    assert mapped.status_code == 200, mapped.text
+
+    section_mapping = await client.post(
+        f"/api/v1/sections/{section_id}/disclosures/{employees_disclosure['id']}",
+        headers=headers,
+    )
+    assert section_mapping.status_code == 201, section_mapping.text
+
+    missing = await client.post(
+        f"/api/v1/projects/{project_id}/ai/missing-data-analysis",
+        headers=headers,
+    )
+    assert missing.status_code == 200, missing.text
+
+    context = await client.get(
+        f"/api/v1/sections/{section_id}/planning-context",
+        headers=headers,
+    )
+    assert context.status_code == 200, context.text
+    context_json = context.json()
+    assert [item["id"] for item in context_json["facts"]] == [employee_fact_id]
+    assert unrelated_fact_id not in {item["id"] for item in context_json["facts"]}
+    assert employee_anchor["id"] in {
+        item["anchor_id"] for item in context_json["evidence"]
+    }
+    assert context_json["missing_items"]
+    assert context_json["warnings"] == []
+
+    stale_manual_plan = await client.put(
+        f"/api/v1/sections/{section_id}/writing-plan",
+        headers=headers,
+        json={
+            "goal": "Describe employees",
+            "fact_ids": [unrelated_fact_id],
+            "status": "CONFIRMED",
+        },
+    )
+    assert stale_manual_plan.status_code == 409, stale_manual_plan.text
+    assert stale_manual_plan.json()["error"]["code"] == "WRITING_PLAN_CONTEXT_STALE"
+
+    class OutOfScopePlanLLM:
+        async def generate_structured(self, system, user, schema, model_profile="STRONG"):
+            assert schema is SectionPlan
+            return SectionPlan(
+                goal="Describe employees",
+                fact_ids=[UUID(unrelated_fact_id)],
+            )
+
+    async with SessionLocal() as session:
+        with pytest.raises(Conflict) as exc:
+            await SectionPlanningWorkflow(session, OutOfScopePlanLLM()).run(
+                UUID(project_id), UUID(section_id)
+            )
+        assert exc.value.code == "WRITING_PLAN_CONTEXT_STALE"
+
+    requirement_ids = [item["id"] for item in context_json["requirements"]]
+    missing_item_ids = [item["id"] for item in context_json["missing_items"]]
+
+    class ValidPlanLLM:
+        async def generate_structured(self, system, user, schema, model_profile="STRONG"):
+            if schema is SectionPlan:
+                return SectionPlan(
+                    goal="Describe employees",
+                    recommended_structure=["员工概览", "员工结构"],
+                    key_messages=["Use confirmed employee data only"],
+                    disclosure_ids=[UUID(employees_disclosure["id"])],
+                    requirement_ids=[UUID(value) for value in requirement_ids],
+                    fact_ids=[UUID(employee_fact_id)],
+                    evidence_anchor_ids=[UUID(employee_anchor["id"])],
+                    missing_item_ids=[UUID(value) for value in missing_item_ids],
+                    warnings=["Employee breakdown remains missing"],
+                )
+            if schema is SectionDraft:
+                return SectionDraft(blocks=[])
+            raise AssertionError(schema)
+
+    async with SessionLocal() as session:
+        plan = await SectionPlanningWorkflow(session, ValidPlanLLM()).run(
+            UUID(project_id), UUID(section_id)
+        )
+        assert plan["status"] == "DRAFT"
+        assert plan["fact_ids"] == [employee_fact_id]
+        await session.commit()
+
+    async with SessionLocal() as session:
+        with pytest.raises(Conflict) as exc:
+            await SectionWritingWorkflow(session, ValidPlanLLM()).run(
+                (await session.scalar(select(Project.tenant_id).where(Project.id == UUID(project_id)))),
+                UUID(project_id),
+                (await session.scalar(
+                    select(TenantMembership.user_id).where(
+                        TenantMembership.tenant_id
+                        == (await session.scalar(
+                            select(Project.tenant_id).where(Project.id == UUID(project_id))
+                        ))
+                    )
+                )),
+                UUID(section_id),
+            )
+        assert exc.value.code == "WRITING_PLAN_NOT_CONFIRMED"
+
+    confirmed_plan = await client.put(
+        f"/api/v1/sections/{section_id}/writing-plan",
+        headers=headers,
+        json={
+            "goal": plan["goal"],
+            "recommended_structure": plan["recommended_structure"],
+            "key_messages": plan["key_messages"],
+            "disclosure_ids": plan["disclosure_ids"],
+            "requirement_ids": plan["requirement_ids"],
+            "fact_ids": plan["fact_ids"],
+            "evidence_anchor_ids": plan["evidence_anchor_ids"],
+            "missing_item_ids": plan["missing_item_ids"],
+            "missing_items": plan["missing_items"],
+            "warnings": plan["warnings"],
+            "status": "CONFIRMED",
+        },
+    )
+    assert confirmed_plan.status_code == 200, confirmed_plan.text
+    assert confirmed_plan.json()["status"] == "CONFIRMED"
+
+    removed = await client.delete(
+        f"/api/v1/sections/{section_id}/disclosures/{employees_disclosure['id']}",
+        headers=headers,
+    )
+    assert removed.status_code == 204, removed.text
+    refreshed_section = await client.get(
+        f"/api/v1/sections/{section_id}",
+        headers=headers,
+    )
+    assert refreshed_section.status_code == 200
+    assert refreshed_section.json()["writing_plan"] == {}
