@@ -273,7 +273,7 @@ export type StandardVersion = {
   name: string;
   effective_date: string | null;
   status: string;
-  metadata: Record<string, unknown>;
+  metadata_json: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 };
