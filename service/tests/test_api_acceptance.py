@@ -527,3 +527,69 @@ async def test_fact_evidence_trace_and_revision_history(client):
     ]
     assert [item["revision_no"] for item in history[:3]] == [3, 2, 1]
     assert history[0]["snapshot"]["status"] == "CONFIRMED"
+
+
+@pytest.mark.asyncio
+async def test_fact_conflict_detail_and_human_resolution(client):
+    await seed_tenant()
+    headers = await login(client, "admin@example.com")
+    _, project_id = await create_company_project(client, headers)
+
+    base = {
+        "fact_type": "METRIC",
+        "metric_code": "EMPLOYEE_TOTAL",
+        "name": "Employee total",
+        "value_type": "NUMBER",
+        "unit": "person",
+        "period_start": "2026-01-01",
+        "period_end": "2026-12-31",
+        "entity_scope": "GROUP",
+        "anchor_ids": [],
+        "source_type": "HUMAN",
+    }
+    first = await client.post(
+        f"/api/v1/projects/{project_id}/facts",
+        headers=headers,
+        json={**base, "number_value": 1287, "raw_value": "1287"},
+    )
+    assert first.status_code == 201, first.text
+    second = await client.post(
+        f"/api/v1/projects/{project_id}/facts",
+        headers=headers,
+        json={**base, "number_value": 1293, "raw_value": "1293"},
+    )
+    assert second.status_code == 201, second.text
+
+    conflicts = await client.get(
+        f"/api/v1/projects/{project_id}/fact-conflicts",
+        headers=headers,
+    )
+    assert conflicts.status_code == 200, conflicts.text
+    group = next(item for item in conflicts.json() if item["status"] == "OPEN")
+
+    detail = await client.get(
+        f"/api/v1/fact-conflicts/{group['id']}",
+        headers=headers,
+    )
+    assert detail.status_code == 200, detail.text
+    member_ids = {item["id"] for item in detail.json()["members"]}
+    assert member_ids == {first.json()["id"], second.json()["id"]}
+
+    resolved = await client.post(
+        f"/api/v1/fact-conflicts/{group['id']}/resolve",
+        headers=headers,
+        params={"fact_id": first.json()["id"]},
+    )
+    assert resolved.status_code == 200, resolved.text
+
+    selected = await client.get(f"/api/v1/facts/{first.json()['id']}", headers=headers)
+    rejected = await client.get(f"/api/v1/facts/{second.json()['id']}", headers=headers)
+    assert selected.json()["status"] == "CONFIRMED"
+    assert rejected.json()["status"] == "REJECTED"
+
+    detail_after = await client.get(
+        f"/api/v1/fact-conflicts/{group['id']}",
+        headers=headers,
+    )
+    assert detail_after.json()["group"]["status"] == "RESOLVED"
+    assert detail_after.json()["group"]["resolved_fact_id"] == first.json()["id"]
