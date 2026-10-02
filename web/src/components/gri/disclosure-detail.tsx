@@ -145,10 +145,7 @@ export function DisclosureDetail({
           <div className="mt-4 grid gap-4">
             {requirements.map((requirement) => {
               const metricCodes = requirementMetricCodes({
-                ...requirement,
-                disclosure_id: disclosure.disclosure_id,
-                disclosure_code: disclosure.code,
-                disclosure_title: disclosure.title,
+                required_data_json: requirement.required_data_json,
               });
               return (
                 <Card key={requirement.id} padding={4}>
