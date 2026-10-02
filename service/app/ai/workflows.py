@@ -1,4 +1,5 @@
 from sqlalchemy import func, select
+from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.llm import LLMGateway
@@ -173,23 +174,34 @@ class SectionWritingWorkflow:
                 "WRITING_PLAN_NOT_CONFIRMED",
                 "Section writing requires a human-confirmed writing plan",
             )
-        facts = list(
-            (
-                await self.s.scalars(
-                    select(Fact)
-                    .where(
-                        Fact.project_id == project_id,
-                        Fact.status == "CONFIRMED",
-                        Fact.deleted_at.is_(None),
+        planned_fact_ids = {
+            UUID(str(value)) for value in section.writing_plan.get("fact_ids", [])
+        }
+        facts = []
+        if planned_fact_ids:
+            facts = list(
+                (
+                    await self.s.scalars(
+                        select(Fact)
+                        .where(
+                            Fact.project_id == project_id,
+                            Fact.id.in_(planned_fact_ids),
+                            Fact.status == "CONFIRMED",
+                            Fact.deleted_at.is_(None),
+                        )
+                        .order_by(Fact.created_at)
                     )
-                    .order_by(Fact.created_at)
+                ).all()
+            )
+            if {fact.id for fact in facts} != planned_fact_ids:
+                raise Conflict(
+                    "WRITING_PLAN_CONTEXT_STALE",
+                    "One or more planned Facts are no longer confirmed and available",
                 )
-            ).all()
-        )
         prompt = (
             f"Section: {section.title}\n"
             f"Plan: {section.writing_plan}\n"
-            "Confirmed facts:\n"
+            "Confirmed facts allowed by the plan:\n"
             + "\n".join(
                 f"{fact.id}: {fact.name}="
                 f"{fact.number_value if fact.number_value is not None else fact.text_value} "
