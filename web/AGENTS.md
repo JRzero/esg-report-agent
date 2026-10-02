@@ -76,3 +76,14 @@ Do not add a general rich-text editor in Spec 009. The Report Workspace gets a d
 - RECEIVED or RESOLVED Missing Item does not imply COVERED Requirement.
 - Link mapped Facts back to Fact Center rather than duplicating fact editing inside GRI.
 - After Fact Mapping/applicability changes, invalidate Disclosure, Requirement and detail queries.
+
+
+## Report Planning
+- Report Section is the smallest formal planning/writing scope.
+- A Section may only map Disclosures already attached to the same Project.
+- Planning Context must come from the Service scoped-context endpoint; do not rebuild or broaden it in browser code.
+- AI Writing Plans are DRAFT by default and require explicit human confirmation.
+- Section Writing must never be presented as available for an unconfirmed/stale plan.
+- Changing Section title/description/hierarchy or Disclosure mappings invalidates the old Writing Plan.
+- Formal plan resources must reference current scoped Disclosure/Requirement/CONFIRMED Fact/Evidence/Missing Item IDs only.
+- Missing Items are warnings/follow-up context, never factual claims.
