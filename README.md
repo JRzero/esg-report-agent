@@ -135,3 +135,24 @@ Missing Item workflow
 ```
 
 NOT_APPLICABLE is an explicit project decision. Missing Item operational state remains separate from Requirement coverage.
+
+
+## Report Workspace & Section Planning
+
+The reporting pipeline now has an explicit pre-writing control boundary:
+
+```text
+Confirmed Fact
+  ↓
+GRI Requirement
+  ↓
+Report Section
+  ↓
+Scoped Planning Context
+  ↓
+AI Writing Plan (DRAFT)
+  ↓
+Human confirmation
+```
+
+Formal Section Writing is blocked until the current plan is confirmed.
