@@ -55,3 +55,14 @@ Do not add a general rich-text editor in Spec 009. The Report Workspace gets a d
 - HISTORICAL material may produce candidates only with period awareness and human confirmation.
 - Do not transform a Reference card into an Evidence card based on UI context.
 - New file revisions create immutable DocumentVersion records; never imply in-place replacement.
+
+
+## Fact Center
+- AI-created Facts are candidates, not business truth.
+- Only PENDING Facts may use ordinary Confirm/Reject actions.
+- CONFLICT Facts must be resolved through the conflict-group endpoint; never synthesize or auto-select a winner in the UI.
+- CONFIRMED Facts are immutable through ordinary PATCH.
+- PENDING Facts may edit semantic-key fields; CONFLICT candidates may edit value/unit only.
+- Fact Evidence must display and link to the exact Service DocumentVersion + DocumentAnchor.
+- Fact Revision history is read-only/append-only.
+- Do not infer Evidence from Reference or Standard material.

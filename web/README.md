@@ -126,3 +126,24 @@ DocumentAnchor inspection, reprocessing, original-file download and Fact Extract
 
 The browser does not independently parse PDF/Excel/Word/PPT into authoritative evidence coordinates.
 The Service `DocumentAnchor` remains the provenance source of truth.
+
+
+## Fact Center
+
+Implemented:
+
+```text
+/projects/{projectId}/facts
+/projects/{projectId}/facts/{factId}
+```
+
+The Fact Center consumes real Service Fact, Evidence, Revision and Conflict contracts.
+
+Decision rules:
+
+- PENDING → edit / confirm / reject
+- CONFLICT → explicit Conflict Center resolution only
+- CONFIRMED → immutable ordinary edit
+- REJECTED → retained for audit
+
+Evidence links deep-link back to the exact Material DocumentVersion and DocumentAnchor.

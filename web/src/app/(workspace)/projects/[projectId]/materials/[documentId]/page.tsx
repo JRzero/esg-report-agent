@@ -3,10 +3,13 @@ import {DocumentEvidenceViewer} from '@/components/materials/document-evidence-v
 
 export default async function MaterialDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{projectId: string; documentId: string}>;
+  searchParams: Promise<{version?: string; anchor?: string}>;
 }) {
   const {projectId, documentId} = await params;
+  const {version, anchor} = await searchParams;
 
   return (
     <div>
@@ -17,7 +20,12 @@ export default async function MaterialDetailPage({
           ← 返回资料中心
         </Link>
       </div>
-      <DocumentEvidenceViewer projectId={projectId} documentId={documentId} />
+      <DocumentEvidenceViewer
+        projectId={projectId}
+        documentId={documentId}
+        initialVersionId={version}
+        focusAnchorId={anchor}
+      />
     </div>
   );
 }

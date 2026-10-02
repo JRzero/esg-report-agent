@@ -8,6 +8,11 @@ export const queryKeys = {
   anchors: (versionId: string) => ['document-versions', versionId, 'anchors'] as const,
   tasks: (projectId: string) => ['projects', projectId, 'tasks'] as const,
   facts: (projectId: string) => ['projects', projectId, 'facts'] as const,
+  fact: (factId: string) => ['facts', factId] as const,
+  factEvidence: (factId: string) => ['facts', factId, 'evidence'] as const,
+  factRevisions: (factId: string) => ['facts', factId, 'revisions'] as const,
+  factConflicts: (projectId: string) => ['projects', projectId, 'fact-conflicts'] as const,
+  factConflict: (groupId: string) => ['fact-conflicts', groupId] as const,
   disclosures: (projectId: string) => ['projects', projectId, 'disclosures'] as const,
   reports: (projectId: string) => ['projects', projectId, 'reports'] as const,
 };

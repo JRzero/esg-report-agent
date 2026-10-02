@@ -47,12 +47,16 @@ function StatusBadge({label, value}: {label: string; value: string}) {
 export function DocumentEvidenceViewer({
   projectId,
   documentId,
+  initialVersionId,
+  focusAnchorId,
 }: {
   projectId: string;
   documentId: string;
+  initialVersionId?: string;
+  focusAnchorId?: string;
 }) {
   const detail = useDocument(documentId);
-  const [selectedVersionId, setSelectedVersionId] = useState('');
+  const [selectedVersionId, setSelectedVersionId] = useState(initialVersionId ?? '');
   const [newVersionFile, setNewVersionFile] = useState<File | null>(null);
   const [message, setMessage] = useState('');
 
@@ -260,7 +264,14 @@ export function DocumentEvidenceViewer({
       ) : null}
 
       <div className="mt-8 grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
-        {selectedVersion ? <AnchorViewer versionId={selectedVersion.id} /> : null}
+        {selectedVersion ? (
+          <AnchorViewer
+            versionId={selectedVersion.id}
+            focusAnchorId={
+              selectedVersion.id === initialVersionId ? focusAnchorId : undefined
+            }
+          />
+        ) : null}
         <ProjectTaskPanel projectId={projectId} />
       </div>
     </div>

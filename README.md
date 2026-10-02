@@ -97,3 +97,22 @@ Fact Extraction task
 ```
 
 Reference and Standard sources remain separated from enterprise Evidence in both UI and action availability.
+
+
+## Fact Center & Evidence Trace
+
+The Evidence → Fact human-control loop is now implemented:
+
+```text
+DocumentAnchor
+  ↓
+Fact Candidate
+  ↓
+PENDING / CONFLICT
+  ↓
+Human Review
+  ↓
+CONFIRMED / REJECTED
+```
+
+Fact Evidence deep-links to the exact immutable DocumentVersion + DocumentAnchor, and conflict winners can only be selected through the explicit conflict-group resolution contract.

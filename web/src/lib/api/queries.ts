@@ -8,6 +8,12 @@ import type {
   Document,
   DocumentAnchor,
   DocumentDetail,
+  Fact,
+  FactConflictDetail,
+  FactConflictGroup,
+  FactEvidenceTrace,
+  FactRevision,
+  FactUpdateInput,
   Project,
   ProjectCreateInput,
   QueueTaskResult,
@@ -201,4 +207,123 @@ export async function getDocumentDownloadUrl(versionId: string) {
   return browserRequest<{download_url: string}>(
     `/api/document-versions/${versionId}/download`,
   );
+}
+
+
+export function useFacts(projectId: string) {
+  return useQuery({
+    queryKey: queryKeys.facts(projectId),
+    queryFn: () => browserRequest<Fact[]>(`/api/projects/${projectId}/facts`),
+    enabled: Boolean(projectId),
+  });
+}
+
+export function useFact(factId: string) {
+  return useQuery({
+    queryKey: queryKeys.fact(factId),
+    queryFn: () => browserRequest<Fact>(`/api/facts/${factId}`),
+    enabled: Boolean(factId),
+  });
+}
+
+export function useFactEvidence(factId: string) {
+  return useQuery({
+    queryKey: queryKeys.factEvidence(factId),
+    queryFn: () =>
+      browserRequest<FactEvidenceTrace[]>(`/api/facts/${factId}/evidence`),
+    enabled: Boolean(factId),
+  });
+}
+
+export function useFactRevisions(factId: string) {
+  return useQuery({
+    queryKey: queryKeys.factRevisions(factId),
+    queryFn: () =>
+      browserRequest<FactRevision[]>(`/api/facts/${factId}/revisions`),
+    enabled: Boolean(factId),
+  });
+}
+
+export function useFactConflicts(projectId: string) {
+  return useQuery({
+    queryKey: queryKeys.factConflicts(projectId),
+    queryFn: () =>
+      browserRequest<FactConflictGroup[]>(
+        `/api/projects/${projectId}/fact-conflicts`,
+      ),
+    enabled: Boolean(projectId),
+  });
+}
+
+export function useFactConflict(groupId: string) {
+  return useQuery({
+    queryKey: queryKeys.factConflict(groupId),
+    queryFn: () =>
+      browserRequest<FactConflictDetail>(`/api/fact-conflicts/${groupId}`),
+    enabled: Boolean(groupId),
+  });
+}
+
+export function useUpdateFact(projectId: string, factId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: FactUpdateInput) =>
+      browserRequest<Fact>(`/api/facts/${factId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      }),
+    onSuccess: (fact) => {
+      queryClient.setQueryData(queryKeys.fact(factId), fact);
+      void queryClient.invalidateQueries({queryKey: queryKeys.facts(projectId)});
+      void queryClient.invalidateQueries({queryKey: queryKeys.factRevisions(factId)});
+      void queryClient.invalidateQueries({queryKey: queryKeys.factConflicts(projectId)});
+    },
+  });
+}
+
+export function useConfirmFact(projectId: string, factId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      browserRequest<Fact>(`/api/facts/${factId}/confirm`, {method: 'POST'}),
+    onSuccess: (fact) => {
+      queryClient.setQueryData(queryKeys.fact(factId), fact);
+      void queryClient.invalidateQueries({queryKey: queryKeys.facts(projectId)});
+      void queryClient.invalidateQueries({queryKey: queryKeys.factRevisions(factId)});
+      void queryClient.invalidateQueries({queryKey: queryKeys.factConflicts(projectId)});
+    },
+  });
+}
+
+export function useRejectFact(projectId: string, factId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (reason: string) =>
+      browserRequest<Fact>(`/api/facts/${factId}/reject`, {
+        method: 'POST',
+        body: JSON.stringify({reason}),
+      }),
+    onSuccess: (fact) => {
+      queryClient.setQueryData(queryKeys.fact(factId), fact);
+      void queryClient.invalidateQueries({queryKey: queryKeys.facts(projectId)});
+      void queryClient.invalidateQueries({queryKey: queryKeys.factRevisions(factId)});
+      void queryClient.invalidateQueries({queryKey: queryKeys.factConflicts(projectId)});
+    },
+  });
+}
+
+export function useResolveFactConflict(projectId: string, groupId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (factId: string) =>
+      browserRequest<FactConflictGroup>(
+        `/api/fact-conflicts/${groupId}/resolve`,
+        {method: 'POST', body: JSON.stringify({fact_id: factId})},
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({queryKey: queryKeys.facts(projectId)});
+      void queryClient.invalidateQueries({queryKey: queryKeys.factConflicts(projectId)});
+      void queryClient.invalidateQueries({queryKey: queryKeys.factConflict(groupId)});
+    },
+  });
 }

@@ -29,6 +29,7 @@ from app.modules.models import (
     FactConflictGroup,
     FactConflictMember,
     FactEvidence,
+    FactRevision,
     MissingItem,
     ProjectDisclosure,
     ProjectMember,
@@ -611,6 +612,19 @@ async def facts(
     return await FactService(db).list(project_id)
 
 
+@router.get("/facts/{fact_id}", tags=["Facts"])
+async def fact_detail(
+    fact_id: UUID,
+    ctx: RequestContext = Depends(current_context),
+    db: AsyncSession = Depends(get_db),
+):
+    fact = await db.get(Fact, fact_id)
+    if not fact or fact.deleted_at is not None:
+        raise NotFound("FACT_NOT_FOUND", "Fact not found")
+    await ProjectAccess(db).require(fact.project_id, ctx.membership_id, "VIEW_FACT")
+    return fact
+
+
 @router.post("/projects/{project_id}/facts", status_code=201, tags=["Facts"])
 async def create_fact(
     project_id: UUID,
@@ -694,22 +708,69 @@ async def fact_evidence(
     return [
         {
             "fact_evidence_id": evidence.id,
+            "evidence_role": evidence.evidence_role,
+            "confidence": evidence.confidence,
             "anchor": {
                 "id": anchor.id,
                 "type": anchor.anchor_type,
-                "page": anchor.page_start,
-                "sheet": anchor.sheet_name,
-                "cell": anchor.cell_range,
+                "page_start": anchor.page_start,
+                "page_end": anchor.page_end,
+                "sheet_name": anchor.sheet_name,
+                "cell_range": anchor.cell_range,
+                "heading_path": anchor.heading_path,
+                "paragraph_start": anchor.paragraph_start,
+                "paragraph_end": anchor.paragraph_end,
+                "slide_number": anchor.slide_number,
+                "bbox": anchor.bbox,
                 "raw_text": anchor.raw_text,
+                "normalized_text": anchor.normalized_text,
+                "content_hash": anchor.content_hash,
             },
             "document": {
                 "id": document.id,
                 "name": document.name,
                 "source_type": document.source_type,
+                "category_code": document.category_code,
                 "version_id": version.id,
+                "version_no": version.version_no,
+                "original_filename": version.original_filename,
+                "sha256": version.sha256,
             },
         }
         for evidence, anchor, version, document in rows
+    ]
+
+
+@router.get("/facts/{fact_id}/revisions", tags=["Facts"])
+async def fact_revisions(
+    fact_id: UUID,
+    ctx: RequestContext = Depends(current_context),
+    db: AsyncSession = Depends(get_db),
+):
+    fact = await db.get(Fact, fact_id)
+    if not fact:
+        raise NotFound("FACT_NOT_FOUND", "Fact not found")
+    await ProjectAccess(db).require(fact.project_id, ctx.membership_id, "VIEW_FACT")
+    revisions = list(
+        (
+            await db.scalars(
+                select(FactRevision)
+                .where(FactRevision.fact_id == fact_id)
+                .order_by(FactRevision.revision_no.desc())
+            )
+        ).all()
+    )
+    return [
+        {
+            "id": revision.id,
+            "fact_id": revision.fact_id,
+            "revision_no": revision.revision_no,
+            "snapshot": revision.snapshot,
+            "change_type": revision.change_type,
+            "changed_by": revision.changed_by,
+            "created_at": revision.created_at,
+        }
+        for revision in revisions
     ]
 
 
@@ -729,6 +790,43 @@ async def fact_conflicts(
             )
         ).all()
     )
+
+
+@router.get("/fact-conflicts/{group_id}", tags=["Facts"])
+async def fact_conflict_detail(
+    group_id: UUID,
+    ctx: RequestContext = Depends(current_context),
+    db: AsyncSession = Depends(get_db),
+):
+    group = await db.get(FactConflictGroup, group_id)
+    if not group:
+        raise NotFound("FACT_CONFLICT_NOT_FOUND", "Fact conflict not found")
+    await ProjectAccess(db).require(group.project_id, ctx.membership_id, "VIEW_FACT")
+    members = list(
+        (
+            await db.scalars(
+                select(Fact)
+                .join(FactConflictMember, FactConflictMember.fact_id == Fact.id)
+                .where(FactConflictMember.conflict_group_id == group.id)
+                .order_by(Fact.created_at.asc())
+            )
+        ).all()
+    )
+    return {
+        "group": {
+            "id": group.id,
+            "project_id": group.project_id,
+            "semantic_key": group.semantic_key,
+            "conflict_type": group.conflict_type,
+            "status": group.status,
+            "resolved_fact_id": group.resolved_fact_id,
+            "resolved_by": group.resolved_by,
+            "resolved_at": group.resolved_at,
+            "created_at": group.created_at,
+            "updated_at": group.updated_at,
+        },
+        "members": members,
+    }
 
 
 @router.post("/fact-conflicts/{group_id}/resolve", tags=["Facts"])

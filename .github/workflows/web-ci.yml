@@ -8,6 +8,7 @@ on:
       - "specs/009-frontend-foundation-astryx/**"
       - "specs/010-authentication-project-workspace/**"
       - "specs/011-material-center-evidence-viewer/**"
+      - "specs/012-fact-center-evidence-trace/**"
       - ".github/workflows/web-ci.yml"
   pull_request:
     paths:
@@ -50,6 +51,8 @@ jobs:
         run: |
           npm run astryx -- component FileInput --json > /tmp/astryx-file-input.json
           npm run astryx -- component Selector --json > /tmp/astryx-selector.json
+          npm run astryx -- component TextArea --json > /tmp/astryx-textarea.json
+          npm run astryx -- component SegmentedControl --json > /tmp/astryx-segmented-control.json
 
       - name: Lint
         run: npm run lint
