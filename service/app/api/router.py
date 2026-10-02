@@ -1414,9 +1414,14 @@ async def update_section(
         parent = await db.get(ReportSection, values["parent_id"])
         if not parent or parent.report_id != section.report_id or parent.id == section.id:
             raise DomainError("INVALID_SECTION_PARENT", "Invalid parent section", 422)
+    context_fields = {"title", "description", "parent_id", "level"}
+    context_changed = any(
+        key in context_fields and getattr(section, key) != value
+        for key, value in values.items()
+    )
     for key, value in values.items():
         setattr(section, key, value)
-    if {"title", "description", "parent_id", "level"} & set(values):
+    if context_changed:
         section.writing_plan = {}
         if section.status != "COMPLETED":
             section.status = "NOT_STARTED"
@@ -1887,6 +1892,10 @@ async def retry_task(
     if obj.project_id:
         await ProjectAccess(db).require(obj.project_id, ctx.membership_id, "GENERATE_REPORT")
     obj = await TaskService(db).retry(obj)
+    if obj.task_type == "SECTION_PLANNING" and obj.target_id:
+        section = await db.get(ReportSection, obj.target_id)
+        if section and section.project_id == obj.project_id:
+            section.status = "GENERATING"
     await db.commit()
     run_ai_task.delay(str(obj.id))
     return obj
@@ -1904,6 +1913,10 @@ async def cancel_task(
     if obj.project_id:
         await ProjectAccess(db).require(obj.project_id, ctx.membership_id, "GENERATE_REPORT")
     obj = await TaskService(db).cancel(obj)
+    if obj.task_type == "SECTION_PLANNING" and obj.target_id:
+        section = await db.get(ReportSection, obj.target_id)
+        if section and section.project_id == obj.project_id:
+            section.status = "DRAFT" if section.writing_plan else "NOT_STARTED"
     await db.commit()
     return obj
 
