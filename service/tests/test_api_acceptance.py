@@ -138,7 +138,7 @@ async def test_reference_document_cannot_be_fact_evidence(client):
         headers=headers,
         json={
             "name": "Employee total",
-            "metric_code": "EMPLOYEE_TOTAL",
+            "metric_code": "EMPLOYEE_TOTAL_PLANNING",
             "value_type": "NUMBER",
             "number_value": 999,
             "unit": "person",
@@ -867,20 +867,64 @@ async def test_report_section_planning_context_is_scoped_and_invalidated(client)
     headers = await login(client, "admin@example.com")
     _, project_id = await create_company_project(client, headers)
 
-    standards = await client.get("/api/v1/standards", headers=headers)
-    gri = next(item for item in standards.json() if item["code"] == "GRI")
-    versions = await client.get(
-        f"/api/v1/standards/{gri['id']}/versions",
-        headers=headers,
-    )
-    gri_2021 = next(item for item in versions.json() if item["version_code"] == "2021")
-    disclosures = await client.get(
-        f"/api/v1/standard-versions/{gri_2021['id']}/disclosures",
-        headers=headers,
-    )
-    employees_disclosure = next(
-        item for item in disclosures.json() if item["code"] == "GRI 2-7"
-    )
+    async with SessionLocal() as session:
+        employee_metric = MetricDefinition(
+            code="EMPLOYEE_TOTAL_PLANNING",
+            name="Employee total planning",
+            data_type="NUMBER",
+            default_unit="person",
+        )
+        scope1_metric = MetricDefinition(
+            code="GHG_SCOPE1_PLANNING",
+            name="Scope 1 planning",
+            data_type="NUMBER",
+            default_unit="tCO2e",
+        )
+        standard = Standard(
+            code="GRI-PLANNING",
+            name="GRI Planning Test",
+            publisher="Test Publisher",
+        )
+        session.add_all([employee_metric, scope1_metric, standard])
+        await session.flush()
+        standard_version = StandardVersion(
+            standard_id=standard.id,
+            version_code="2021",
+            name="GRI Planning 2021",
+        )
+        session.add(standard_version)
+        await session.flush()
+        disclosure = Disclosure(
+            standard_version_id=standard_version.id,
+            code="GRI 2-7",
+            title="Employees",
+            sort_order=1,
+        )
+        session.add(disclosure)
+        await session.flush()
+        session.add_all(
+            [
+                DisclosureRequirement(
+                    disclosure_id=disclosure.id,
+                    requirement_code="a",
+                    content="Report total employees.",
+                    required_data_json={"metric_codes": ["EMPLOYEE_TOTAL_PLANNING"]},
+                    sort_order=1,
+                ),
+                DisclosureRequirement(
+                    disclosure_id=disclosure.id,
+                    requirement_code="b",
+                    content="Report employee breakdown.",
+                    required_data_json={"metric_codes": ["EMPLOYEE_BREAKDOWN_PLANNING"]},
+                    sort_order=2,
+                ),
+            ]
+        )
+        await session.commit()
+        employee_metric_id = str(employee_metric.id)
+        scope1_metric_id = str(scope1_metric.id)
+        gri_2021 = {"id": str(standard_version.id)}
+        employees_disclosure = {"id": str(disclosure.id)}
 
     report = await client.post(
         f"/api/v1/projects/{project_id}/reports",
@@ -936,17 +980,6 @@ async def test_report_section_planning_context_is_scoped_and_invalidated(client)
     )
     employee_anchor = next(item for item in anchors.json() if item["cell_range"] == "B1")
 
-    async with SessionLocal() as session:
-        employee_metric = await session.scalar(
-            select(MetricDefinition).where(MetricDefinition.code == "EMPLOYEE_TOTAL")
-        )
-        scope1_metric = await session.scalar(
-            select(MetricDefinition).where(MetricDefinition.code == "GHG_SCOPE1")
-        )
-        assert employee_metric and scope1_metric
-        employee_metric_id = str(employee_metric.id)
-        scope1_metric_id = str(scope1_metric.id)
-
     employee_fact = await client.post(
         f"/api/v1/projects/{project_id}/facts",
         headers=headers,
@@ -978,7 +1011,7 @@ async def test_report_section_planning_context_is_scoped_and_invalidated(client)
         json={
             "fact_type": "METRIC",
             "metric_definition_id": scope1_metric_id,
-            "metric_code": "GHG_SCOPE1",
+            "metric_code": "GHG_SCOPE1_PLANNING",
             "name": "Scope 1 emissions",
             "value_type": "NUMBER",
             "number_value": 1200,
