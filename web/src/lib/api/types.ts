@@ -145,3 +145,112 @@ export type QueueTaskResult = {
   task_id: string;
   status: string;
 };
+
+
+export type FactStatus = 'PENDING' | 'CONFIRMED' | 'CONFLICT' | 'REJECTED';
+export type FactValueType = 'NUMBER' | 'TEXT' | 'BOOLEAN' | 'DATE' | 'JSON';
+
+export type Fact = {
+  id: string;
+  tenant_id: string;
+  project_id: string;
+  fact_type: string;
+  metric_definition_id: string | null;
+  semantic_key: string;
+  name: string;
+  value_type: FactValueType;
+  number_value: string | number | null;
+  text_value: string | null;
+  boolean_value: boolean | null;
+  date_value: string | null;
+  json_value: Record<string, unknown> | null;
+  raw_value: string | null;
+  unit: string | null;
+  period_start: string | null;
+  period_end: string | null;
+  entity_scope: string | null;
+  dimensions: Record<string, unknown>;
+  status: FactStatus;
+  confidence: string | number | null;
+  source_type: 'AI' | 'HUMAN' | string;
+  confirmed_by: string | null;
+  confirmed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FactUpdateInput = {
+  name?: string;
+  number_value?: number | null;
+  text_value?: string | null;
+  boolean_value?: boolean | null;
+  date_value?: string | null;
+  json_value?: Record<string, unknown> | null;
+  raw_value?: string | null;
+  unit?: string | null;
+  period_start?: string | null;
+  period_end?: string | null;
+  entity_scope?: string | null;
+  dimensions?: Record<string, unknown>;
+};
+
+export type FactEvidenceTrace = {
+  fact_evidence_id: string;
+  evidence_role: string;
+  confidence: string | number | null;
+  anchor: {
+    id: string;
+    type: string;
+    page_start: number | null;
+    page_end: number | null;
+    sheet_name: string | null;
+    cell_range: string | null;
+    heading_path: string[] | null;
+    paragraph_start: number | null;
+    paragraph_end: number | null;
+    slide_number: number | null;
+    bbox: Record<string, unknown> | null;
+    raw_text: string;
+    normalized_text: string | null;
+    content_hash: string;
+  };
+  document: {
+    id: string;
+    name: string;
+    source_type: DocumentSourceType;
+    category_code: string | null;
+    version_id: string;
+    version_no: number;
+    original_filename: string;
+    sha256: string;
+  };
+};
+
+export type FactRevision = {
+  id: string;
+  fact_id: string;
+  revision_no: number;
+  snapshot: Record<string, unknown>;
+  change_type: string;
+  changed_by: string | null;
+  created_at: string;
+};
+
+export type FactConflictGroup = {
+  id: string;
+  tenant_id?: string;
+  project_id: string;
+  semantic_key: string;
+  conflict_type: string;
+  status: 'OPEN' | 'RESOLVED' | 'IGNORED' | string;
+  resolved_fact_id: string | null;
+  resolved_by: string | null;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FactConflictDetail = {
+  group: FactConflictGroup;
+  members: Fact[];
+};
