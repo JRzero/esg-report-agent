@@ -29,12 +29,16 @@ export function disclosureStatusLabel(status: EffectiveDisclosureStatus) {
 export function disclosureStatusVariant(
   status: EffectiveDisclosureStatus,
 ): 'green' | 'warning' | 'error' | 'neutral' {
-  return {
-    COVERED: 'green',
-    PARTIAL: 'warning',
-    MISSING: 'error',
-    NOT_APPLICABLE: 'neutral',
-  }[status];
+  switch (status) {
+    case 'COVERED':
+      return 'green';
+    case 'PARTIAL':
+      return 'warning';
+    case 'MISSING':
+      return 'error';
+    case 'NOT_APPLICABLE':
+      return 'neutral';
+  }
 }
 
 export function countDisclosureStatuses(disclosures: ProjectDisclosure[]) {
