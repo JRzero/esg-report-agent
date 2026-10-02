@@ -110,3 +110,19 @@ Local seed login:
 admin@example.com
 admin123
 ```
+
+
+## Material Center
+
+Implemented project routes:
+
+```text
+/projects/{projectId}/materials
+/projects/{projectId}/materials/{documentId}
+```
+
+The Material Center uses the real Service document contracts for upload, immutable versions, parsing status,
+DocumentAnchor inspection, reprocessing, original-file download and Fact Extraction task submission.
+
+The browser does not independently parse PDF/Excel/Word/PPT into authoritative evidence coordinates.
+The Service `DocumentAnchor` remains the provenance source of truth.

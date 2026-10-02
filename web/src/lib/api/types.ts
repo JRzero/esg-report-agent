@@ -54,3 +54,94 @@ export type ProjectCreateInput = {
   period_end: string;
   source_project_id?: string | null;
 };
+
+
+export type DocumentSourceType =
+  | 'EVIDENCE'
+  | 'REFERENCE'
+  | 'STANDARD'
+  | 'HISTORICAL';
+
+export type Document = {
+  id: string;
+  tenant_id: string;
+  project_id: string;
+  name: string;
+  source_type: DocumentSourceType;
+  category_code: string | null;
+  status: string;
+  sensitivity_level: string;
+  inherited_from_document_id: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string | null;
+};
+
+export type DocumentVersion = {
+  id: string;
+  document_id: string;
+  version_no: number;
+  original_filename: string;
+  mime_type: string | null;
+  file_extension: string | null;
+  file_size: number;
+  sha256: string;
+  validation_status: string;
+  evidence_parse_status: string;
+  context_status: string;
+  classification_status: string;
+  fact_extraction_status: string;
+  parse_error: string | null;
+  processing_started_at: string | null;
+  uploaded_by: string;
+  uploaded_at: string;
+};
+
+export type DocumentAnchor = {
+  id: string;
+  tenant_id: string;
+  project_id: string;
+  document_version_id: string;
+  anchor_type: string;
+  page_start: number | null;
+  page_end: number | null;
+  sheet_name: string | null;
+  cell_range: string | null;
+  heading_path: string[] | null;
+  paragraph_start: number | null;
+  paragraph_end: number | null;
+  slide_number: number | null;
+  bbox: Record<string, unknown> | null;
+  raw_text: string;
+  normalized_text: string | null;
+  content_hash: string;
+  metadata: Record<string, unknown>;
+};
+
+export type DocumentDetail = {
+  document: Document;
+  versions: DocumentVersion[];
+};
+
+export type AITask = {
+  id: string;
+  task_type: string;
+  status: 'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILED' | 'CANCELLED' | string;
+  progress: string | number;
+  stage: string | null;
+  result_json: Record<string, unknown>;
+  error_code: string | null;
+  error_message: string | null;
+};
+
+export type UploadDocumentResult = {
+  document_id: string;
+  version_id: string;
+  status: string;
+};
+
+export type QueueTaskResult = {
+  task_id: string;
+  status: string;
+};
