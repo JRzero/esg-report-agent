@@ -18,6 +18,15 @@ import type {
   MissingItemUpdateInput,
   Project,
   ProjectCreateInput,
+  Report,
+  ReportCreateInput,
+  ReportSection,
+  SectionCreateInput,
+  SectionDisclosureMapping,
+  SectionPlanningContext,
+  SectionUpdateInput,
+  SectionWritingPlan,
+  SectionWritingPlanInput,
   ProjectDisclosure,
   ProjectDisclosureDetail,
   ProjectDisclosureUpdateInput,
@@ -511,6 +520,183 @@ export function useUpdateMissingItem(projectId: string, itemId: string) {
       void queryClient.invalidateQueries({
         queryKey: queryKeys.missingItems(projectId),
       });
+    },
+  });
+}
+
+
+export function useReports(projectId: string) {
+  return useQuery({
+    queryKey: queryKeys.reports(projectId),
+    queryFn: () => browserRequest<Report[]>(`/api/projects/${projectId}/reports`),
+    enabled: Boolean(projectId),
+  });
+}
+
+export function useCreateReport(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ReportCreateInput) =>
+      browserRequest<Report>(`/api/projects/${projectId}/reports`, {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    onSuccess: (report) => {
+      queryClient.setQueryData(queryKeys.report(report.id), report);
+      void queryClient.invalidateQueries({queryKey: queryKeys.reports(projectId)});
+    },
+  });
+}
+
+export function useReport(reportId: string) {
+  return useQuery({
+    queryKey: queryKeys.report(reportId),
+    queryFn: () => browserRequest<Report>(`/api/reports/${reportId}`),
+    enabled: Boolean(reportId),
+  });
+}
+
+export function useSections(reportId: string) {
+  return useQuery({
+    queryKey: queryKeys.sections(reportId),
+    queryFn: () => browserRequest<ReportSection[]>(`/api/reports/${reportId}/sections`),
+    enabled: Boolean(reportId),
+  });
+}
+
+export function useCreateSection(reportId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SectionCreateInput) =>
+      browserRequest<ReportSection>(`/api/reports/${reportId}/sections`, {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({queryKey: queryKeys.sections(reportId)});
+    },
+  });
+}
+
+export function useSection(sectionId: string) {
+  return useQuery({
+    queryKey: queryKeys.section(sectionId),
+    queryFn: () => browserRequest<ReportSection>(`/api/sections/${sectionId}`),
+    enabled: Boolean(sectionId),
+    refetchInterval: (query) =>
+      query.state.data?.status === 'GENERATING' ? 2000 : false,
+  });
+}
+
+export function useUpdateSection(reportId: string, sectionId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SectionUpdateInput) =>
+      browserRequest<ReportSection>(`/api/sections/${sectionId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      }),
+    onSuccess: (section) => {
+      queryClient.setQueryData(queryKeys.section(sectionId), section);
+      void queryClient.invalidateQueries({queryKey: queryKeys.sections(reportId)});
+      void queryClient.invalidateQueries({queryKey: queryKeys.sectionPlanningContext(sectionId)});
+    },
+  });
+}
+
+export function useSectionDisclosures(sectionId: string) {
+  return useQuery({
+    queryKey: queryKeys.sectionDisclosures(sectionId),
+    queryFn: () =>
+      browserRequest<SectionDisclosureMapping[]>(
+        `/api/sections/${sectionId}/disclosures`,
+      ),
+    enabled: Boolean(sectionId),
+  });
+}
+
+export function useMapSectionDisclosure(reportId: string, sectionId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (disclosureId: string) =>
+      browserRequest<{id: string}>(
+        `/api/sections/${sectionId}/disclosures/${disclosureId}`,
+        {method: 'POST'},
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({queryKey: queryKeys.sectionDisclosures(sectionId)});
+      void queryClient.invalidateQueries({queryKey: queryKeys.section(sectionId)});
+      void queryClient.invalidateQueries({queryKey: queryKeys.sections(reportId)});
+      void queryClient.invalidateQueries({queryKey: queryKeys.sectionPlanningContext(sectionId)});
+    },
+  });
+}
+
+export function useUnmapSectionDisclosure(reportId: string, sectionId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (disclosureId: string) =>
+      browserRequest<void>(
+        `/api/sections/${sectionId}/disclosures/${disclosureId}`,
+        {method: 'DELETE'},
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({queryKey: queryKeys.sectionDisclosures(sectionId)});
+      void queryClient.invalidateQueries({queryKey: queryKeys.section(sectionId)});
+      void queryClient.invalidateQueries({queryKey: queryKeys.sections(reportId)});
+      void queryClient.invalidateQueries({queryKey: queryKeys.sectionPlanningContext(sectionId)});
+    },
+  });
+}
+
+export function useSectionPlanningContext(sectionId: string) {
+  return useQuery({
+    queryKey: queryKeys.sectionPlanningContext(sectionId),
+    queryFn: () =>
+      browserRequest<SectionPlanningContext>(
+        `/api/sections/${sectionId}/planning-context`,
+      ),
+    enabled: Boolean(sectionId),
+  });
+}
+
+export function useGenerateSectionPlan(
+  projectId: string,
+  reportId: string,
+  sectionId: string,
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      browserRequest<QueueTaskResult>(
+        `/api/sections/${sectionId}/ai/writing-plan`,
+        {
+          method: 'POST',
+          headers: {'Idempotency-Key': `section-plan:${sectionId}:${Date.now()}`},
+        },
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({queryKey: queryKeys.section(sectionId)});
+      void queryClient.invalidateQueries({queryKey: queryKeys.sections(reportId)});
+      void queryClient.invalidateQueries({queryKey: queryKeys.tasks(projectId)});
+    },
+  });
+}
+
+export function useSaveSectionPlan(
+  reportId: string,
+  sectionId: string,
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SectionWritingPlanInput) =>
+      browserRequest<SectionWritingPlan>(
+        `/api/sections/${sectionId}/writing-plan`,
+        {method: 'PUT', body: JSON.stringify(input)},
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({queryKey: queryKeys.section(sectionId)});
+      void queryClient.invalidateQueries({queryKey: queryKeys.sections(reportId)});
     },
   });
 }
