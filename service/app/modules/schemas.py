@@ -313,13 +313,18 @@ class BlockUpdate(BaseModel):
 
 class TaskRead(ORMModel):
     id: UUID
+    project_id: UUID | None = None
     task_type: str
+    target_type: str | None = None
+    target_id: UUID | None = None
     status: str
     progress: Decimal
     stage: str | None = None
     result_json: dict
     error_code: str | None = None
     error_message: str | None = None
+    created_at: datetime
+    completed_at: datetime | None = None
 
 
 class ClaimVerifyResponse(BaseModel):
